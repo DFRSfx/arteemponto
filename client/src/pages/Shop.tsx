@@ -1,0 +1,265 @@
+import React, { useState, useMemo } from 'react';
+import { Filter, Search, Grid2x2 as Grid, List, Maximize2 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import ProductCard from '../components/ProductCard';
+import FilterModal from '../components/FilterModal';
+import { mockProducts } from '../data/products';
+
+const PRODUCTS_PER_LOAD = 8;
+
+const Shop: React.FC = () => {
+  const location = useLocation();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
+  const [sortBy, setSortBy] = useState('name');
+  const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'fullscreen'>('grid');
+  const [displayCount, setDisplayCount] = useState(PRODUCTS_PER_LOAD);
+
+  const categories = [...new Set(mockProducts.map(p => p.category))];
+  const colors = [...new Set(mockProducts.flatMap(p => p.colors))];
+
+  // Check URL params for category filter
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const categoryParam = urlParams.get('categoria');
+    if (categoryParam) {
+      setSelectedCategory(decodeURIComponent(categoryParam));
+    } else {
+      setSelectedCategory('');
+    }
+  }, [location.search]);
+
+  const filteredProducts = useMemo(() => {
+    let filtered = mockProducts.filter(product => {
+      // Handle URL filter parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const filterParam = urlParams.get('filter');
+
+      if (filterParam === 'new' && !product.new) return false;
+      if (filterParam === 'featured' && !product.featured) return false;
+
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          product.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = !selectedCategory || product.category === selectedCategory;
+      const matchesColor = !selectedColor || product.colors.includes(selectedColor);
+      const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
+
+      return matchesSearch && matchesCategory && matchesColor && matchesPrice;
+    });
+
+    // Sort products
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'name_desc':
+          return b.name.localeCompare(a.name);
+        case 'price_asc':
+          return a.price - b.price;
+        case 'price_desc':
+          return b.price - a.price;
+        case 'newest':
+          return b.new === a.new ? 0 : b.new ? 1 : -1;
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [searchTerm, selectedCategory, selectedColor, priceRange, sortBy]);
+
+  // Get products to display
+  const currentProducts = filteredProducts.slice(0, displayCount);
+  const hasMore = displayCount < filteredProducts.length;
+
+  // Reset display count when filters change
+  React.useEffect(() => {
+    setDisplayCount(PRODUCTS_PER_LOAD);
+  }, [searchTerm, selectedCategory, selectedColor, priceRange, sortBy]);
+
+  const loadMore = () => {
+    setDisplayCount(prev => prev + PRODUCTS_PER_LOAD);
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setSelectedColor('');
+    setPriceRange([0, 100]);
+    // Não limpa selectedCategory pois vem do navbar
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <FilterModal
+        isOpen={showFilters}
+        onClose={() => setShowFilters(false)}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+        categories={categories}
+        selectedColor={selectedColor}
+        onColorChange={setSelectedColor}
+        colors={colors}
+        priceRange={priceRange}
+        onPriceRangeChange={setPriceRange}
+        onClearFilters={handleClearFilters}
+      />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            Nossa Loja
+          </h1>
+          <p className="text-lg text-gray-600">
+            Explore todos os nossos produtos artesanais de crochê
+          </p>
+        </div>
+
+        {/* Search and Filters Bar */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+            {/* Search */}
+            <div className="relative flex-1 max-w-md w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                placeholder="Procurar produtos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-4">
+              {/* View Mode - Desktop */}
+              <div className="hidden sm:flex border border-gray-300 rounded-md overflow-hidden">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 ${viewMode === 'grid' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                >
+                  <Grid className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 ${viewMode === 'list' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                >
+                  <List className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* View Mode - Mobile */}
+              <div className="flex sm:hidden border border-gray-300 rounded-md overflow-hidden">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 ${viewMode === 'grid' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                  title="2x2 Grid"
+                >
+                  <Grid className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('fullscreen')}
+                  className={`p-2 ${viewMode === 'fullscreen' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                  title="Tela Cheia"
+                >
+                  <Maximize2 className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Filters Toggle */}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                <Filter className="h-5 w-5" />
+                Filtrar & Ordenar
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Results */}
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-gray-600">
+            {filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}
+          </p>
+          
+          {(searchTerm || selectedColor || priceRange[0] !== 0 || priceRange[1] !== 100) && (
+            <button
+              onClick={handleClearFilters}
+              className="text-primary-600 hover:text-primary-700 font-medium"
+            >
+              Limpar Filtros
+            </button>
+          )}
+        </div>
+
+        {/* Products Grid */}
+        {viewMode === 'fullscreen' ? (
+          <div className="relative">
+            <div className="overflow-x-auto scrollbar-hide snap-x snap-mandatory">
+              <div className="flex gap-4">
+                {currentProducts.map((product) => (
+                  <div key={product.id} className="w-screen flex-shrink-0 snap-center px-4">
+                    <ProductCard product={product} viewMode="fullscreen" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Pagination Dots */}
+            <div className="flex justify-center gap-2 mt-4">
+              {currentProducts.map((_, index) => (
+                <div
+                  key={index}
+                  className="w-2 h-2 rounded-full bg-gray-300"
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className={`grid gap-6 ${
+            viewMode === 'grid'
+              ? 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+              : 'grid-cols-1'
+          }`}>
+            {currentProducts.map((product) => (
+              <ProductCard key={product.id} product={product} viewMode={viewMode} />
+            ))}
+          </div>
+        )}
+
+        {/* Load More Button */}
+        {hasMore && (
+          <div className="mt-8 flex justify-center">
+            <button
+              onClick={loadMore}
+              className="px-8 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-300 font-medium text-lg"
+            >
+              Carregar Mais
+            </button>
+          </div>
+        )}
+
+        {filteredProducts.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-lg text-gray-500 mb-4">
+              Nenhum produto encontrado com os filtros selecionados
+            </p>
+            <button
+              onClick={handleClearFilters}
+              className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+            >
+              Ver Todos os Produtos
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Shop;
