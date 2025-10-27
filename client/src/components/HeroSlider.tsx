@@ -11,33 +11,35 @@ interface SlideData {
   backgroundImage: string;
   textColor?: 'white' | 'dark';
 }
-
+{/*backgroundImage: 'https://mercadurumi.pt/wp-content/uploads/2025/06/Banner-Spesso1-Home.jpg', */}
+{/*backgroundImage: 'https://mercadurumi.pt/wp-content/uploads/2025/03/Banner-Clea500-saldo.jpg', */}
+{/*backgroundImage: 'https://mercadurumi.pt/wp-content/uploads/2024/09/Carrossel-Papier.jpg', */}
 const slides: SlideData[] = [
   {
     id: 1,
-    title: 'Linhas Premium para Crochê Artesanal',
-    description: 'Materiais de alta qualidade para criar peças únicas e duradouras com técnicas tradicionais.',
-    buttonText: 'Explorar Materiais',
-    buttonLink: '/loja',
-    backgroundImage: 'https://mercadurumi.pt/wp-content/uploads/2025/06/Banner-Spesso1-Home.jpg',
+    title: 'Algo por escrever aqui',  
+    description: 'Algo por escrever aqui.',
+    buttonText: 'Algo por escrever aqui',
+    buttonLink: '/loja', 
+    backgroundImage: 'https://image.slidesdocs.com/responsive-images/background/top-down-view-of-colorful-crochet-texture-powerpoint-background_d298c47843__960_540.jpg', 
     textColor: 'white'
   },
   {
     id: 2,
-    title: 'Tradição e Qualidade em Cada Peça',
-    description: 'Linha tradicional com preço acessível para criar suas peças favoritas de crochê.',
+    title: 'Algo por escrever aqui',
+    description: 'Algo por escrever aqui.',
     buttonText: 'Ver Produtos',
     buttonLink: '/loja',
-    backgroundImage: 'https://mercadurumi.pt/wp-content/uploads/2025/03/Banner-Clea500-saldo.jpg',
+    backgroundImage: 'https://image.slidesdocs.com/responsive-images/background/top-down-view-of-colorful-crochet-texture-powerpoint-background_d298c47843__960_540.jpg', 
     textColor: 'white'
   },
   {
     id: 3,
-    title: 'Material Sustentável e Inovador',
-    description: 'Descubra nossa linha eco-friendly em formato de fita, perfeita para projetos modernos.',
-    buttonText: 'Conhecer Linha',
+    title: 'Algo por escrever aqui',
+    description: 'Algo por escrever aqui.',
+    buttonText: 'Algo por escrever aqui',
     buttonLink: '/loja?filter=featured',
-    backgroundImage: 'https://mercadurumi.pt/wp-content/uploads/2024/09/Carrossel-Papier.jpg',
+    backgroundImage: 'https://image.slidesdocs.com/responsive-images/background/top-down-view-of-colorful-crochet-texture-powerpoint-background_d298c47843__960_540.jpg',  
     textColor: 'white'
   }
 ];
