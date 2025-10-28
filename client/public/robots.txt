@@ -1,0 +1,11 @@
+# https://www.robotstxt.org/robotstxt.html
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Disallow checkout and cart from search engines
+Disallow: /carrinho
+Disallow: /checkout
+
+# Sitemap location
+Sitemap: https://arte-em-ponto.com/sitemap.xml

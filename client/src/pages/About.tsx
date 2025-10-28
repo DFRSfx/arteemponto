@@ -39,7 +39,7 @@ const About: React.FC = () => {
                 </p>
                 <p>
                   O que começou como um hobby transformou-se numa verdadeira arte. Hoje, partilhamos
-                  o nosso trabalho com pessoas que valorizam o artesanal, o autêntico e o feito com amor.
+                  o nosso trabalho com pessoas que valorizam o autêntico e o feito com amor.
                 </p>
                 <p>
                   Mais do que produtos, criamos memórias. Cada amigurumi, cada peça para o lar,
@@ -50,7 +50,7 @@ const About: React.FC = () => {
             <div className="relative">
               <img
                 src="https://images.pexels.com/photos/5704720/pexels-photo-5704720.jpeg?auto=compress&cs=tinysrgb&w=800"
-                alt="Trabalho artesanal em crochê"
+                alt="Trabalho em crochê"
                 className="rounded-lg shadow-xl"
               />
               <div className="absolute -bottom-6 -left-6 bg-primary-600 text-white p-6 rounded-lg shadow-lg max-w-xs">
@@ -153,7 +153,7 @@ const About: React.FC = () => {
                       <h3 className="font-semibold text-gray-900 mb-1">Decoração para o Lar</h3>
                       <p className="text-gray-600">
                         Peças que transformam ambientes: mantas, almofadas, tapetes e muito mais,
-                        sempre com um toque artesanal único.
+                        sempre com um toque único.
                       </p>
                     </div>
                   </div>
@@ -163,7 +163,7 @@ const About: React.FC = () => {
                       <h3 className="font-semibold text-gray-900 mb-1">Acessórios de Moda</h3>
                       <p className="text-gray-600">
                         Bolsas, carteiras, chapéus e outros acessórios que combinam estilo e funcionalidade
-                        com o charme do trabalho artesanal.
+                        com o charme do trabalho.
                       </p>
                     </div>
                   </div>

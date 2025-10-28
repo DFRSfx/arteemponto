@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ShoppingBag, Heart, Minus, Plus, Star, Share2, ChevronLeft, ChevronRight, Grid2x2 as Grid, Maximize2 } from 'lucide-react';
+import SEO from '../components/SEO';
 import { mockProducts } from '../data/products';
 import { useCart } from '../context/CartContext';
 import ProductCard from '../components/ProductCard';
+import { getProductSchema, getBreadcrumbSchema } from '../utils/schemas';
 
 const Product: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -180,8 +182,30 @@ const Product: React.FC = () => {
     }
   };
 
+  // SEO setup
+  const productSchema = getProductSchema(product);
+  const breadcrumbs = getBreadcrumbSchema([
+    { name: 'Início', url: '/' },
+    { name: 'Loja', url: '/loja' },
+    { name: product.category, url: `/loja?categoria=${product.category}` },
+    { name: product.name, url: `/produto/${product.id}` },
+  ]);
+
+  const schemas = {
+    '@context': 'https://schema.org',
+    '@graph': [productSchema, breadcrumbs],
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <SEO
+        title={product.name}
+        description={`${product.description} - Produto em crochê feito à mão. ${product.inStock ? 'Em stock' : 'Indisponível'}. Preço: €${product.price.toFixed(2)}`}
+        canonical={`/produto/${product.id}`}
+        ogType="product"
+        ogImage={product.images[0]}
+        schema={schemas}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-gray-600 mb-8">

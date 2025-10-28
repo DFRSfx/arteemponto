@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Search, ShoppingCart, Heart, User } from 'lucide-react';
+import { Menu, X, Search, ShoppingCart, Heart, User, LogOut, Package, UserCircle, Settings } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { mockProducts } from '../data/products';
 import { Product } from '../types';
 import AuthModal from './AuthModal';
@@ -30,6 +32,8 @@ const Navbar: React.FC = () => {
   const [scrollLeft, setScrollLeft] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [hasMoved, setHasMoved] = useState(false);
+  const { user, isAuthenticated, logout } = useAuth();
+  const { info } = useToast();
 
   const navigation = [
     { name: 'Home', href: '/' },
@@ -68,7 +72,6 @@ const Navbar: React.FC = () => {
       }
 
       if (searchRef.current && !searchRef.current.contains(event.target as Node) && searchOpen) {
-        // Fechar imediatamente
         setSearchOpen(false);
         setSearchQuery('');
       }
@@ -95,17 +98,13 @@ const Navbar: React.FC = () => {
     setTimeout(() => {
       setUserMenuOpen(false);
       setUserMenuClosing(false);
-    }, 300); // Match animation duration
+    }, 300);
   };
 
   const handleOpenAuthModal = (mode: 'login' | 'register') => {
     setAuthMode(mode);
     setAuthModalOpen(true);
-    setUserMenuClosing(true);
-    setTimeout(() => {
-      setUserMenuOpen(false);
-      setUserMenuClosing(false);
-    }, 300);
+    handleCloseUserMenu();
   };
 
   // Categories drag handlers
@@ -347,9 +346,12 @@ const Navbar: React.FC = () => {
             </button>
 
             {/* Heart - Desktop only */}
-            <button className="hidden md:block p-2 text-gray-600 hover:text-primary-600 transition-colors">
+            <Link 
+              to="/favoritos"
+              className="hidden md:block p-2 text-gray-600 hover:text-primary-600 transition-colors"
+            >
               <Heart className="h-6 w-6" />
-            </button>
+            </Link>
 
             <Link
               to="/carrinho"
@@ -458,7 +460,7 @@ const Navbar: React.FC = () => {
               {/* Divider */}
               <div className="border-t border-gray-200 my-2"></div>
 
-              {/* Perfil Option */}
+              {/* User Account - Mobile */}
               <button
                 onClick={() => {
                   setIsOpen(false);
@@ -468,15 +470,6 @@ const Navbar: React.FC = () => {
               >
                 <User className="h-5 w-5" />
                 Minha Conta
-              </button>
-
-              {/* Favoritos Option */}
-              <button
-                onClick={() => setIsOpen(false)}
-                className="w-full flex items-center gap-3 px-3 py-2 text-base font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-              >
-                <Heart className="h-5 w-5" />
-                Favoritos
               </button>
             </div>
           </div>
@@ -527,7 +520,7 @@ const Navbar: React.FC = () => {
           />
 
           {/* Sidebar */}
-          <div ref={userMenuRef} className={`fixed right-0 top-0 h-full w-full sm:w-[420px] bg-white shadow-2xl z-50 overflow-y-auto ${userMenuClosing ? 'animate-slideOutRight' : 'animate-slideInRight'}`}>
+          <div className={`fixed right-0 top-0 h-full w-full sm:w-[420px] bg-white shadow-2xl z-50 overflow-y-auto ${userMenuClosing ? 'animate-slideOutRight' : 'animate-slideInRight'}`}>
             {/* Close Button */}
             <div className="absolute top-4 right-4 z-10">
               <button
@@ -539,134 +532,211 @@ const Navbar: React.FC = () => {
               </button>
             </div>
 
-            {/* Header com gradiente */}
-            <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 flex flex-col justify-end p-8 pt-20 pb-10 relative overflow-hidden">
-              {/* Decorative circles */}
-              <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-              <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+            {/* Content changes based on authentication */}
+            {!isAuthenticated ? (
+              <>
+                {/* Header com gradiente - Not Authenticated */}
+                <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 flex flex-col justify-end p-8 pt-20 pb-10 relative overflow-hidden">
+                  {/* Decorative circles */}
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+                  <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
 
-              <div className="relative z-10">
-                <div className="inline-block p-3 bg-white/20 backdrop-blur-sm rounded-full mb-4">
-                  <User className="h-8 w-8 text-white" />
+                  <div className="relative z-10">
+                    <div className="inline-block p-3 bg-white/20 backdrop-blur-sm rounded-full mb-4">
+                      <User className="h-8 w-8 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white mb-2">
+                      Olá!
+                    </h2>
+                    <p className="text-white/90 text-sm mb-6">
+                      Ainda não és cliente da Arte em Ponto?<br />
+                      <span className="text-white/70 text-xs">O registo é fácil e grátis!</span>
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        onClick={() => handleOpenAuthModal('register')}
+                        className="flex-1 flex items-center justify-center px-6 py-3 border-2 border-white text-white rounded-lg hover:bg-white hover:text-primary-600 hover:scale-105 transition-all duration-200 font-semibold text-sm shadow-lg hover:shadow-xl"
+                      >
+                        CRIAR CONTA
+                      </button>
+                      <button
+                        onClick={() => handleOpenAuthModal('login')}
+                        className="flex-1 flex items-center justify-center px-6 py-3 bg-white text-primary-600 rounded-lg hover:bg-primary-50 hover:scale-105 transition-all duration-200 font-semibold text-sm shadow-lg hover:shadow-xl"
+                      >
+                        INICIAR SESSÃO
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">
-                  Olá!
-                </h2>
-                <p className="text-white/90 text-sm mb-6">
-                  Ainda não és cliente da Arte em Ponto?<br />
-                  <span className="text-white/70 text-xs">O registo é fácil e grátis!</span>
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenAuthModal('register');
-                    }}
-                    className="flex-1 flex items-center justify-center px-6 py-3 border-2 border-white text-white rounded-lg hover:bg-white hover:text-primary-600 hover:scale-105 transition-all duration-200 font-semibold text-sm shadow-lg hover:shadow-xl"
-                  >
-                    CRIAR CONTA
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenAuthModal('login');
-                    }}
-                    className="flex-1 flex items-center justify-center px-6 py-3 bg-white text-primary-600 rounded-lg hover:bg-primary-50 hover:scale-105 transition-all duration-200 font-semibold text-sm shadow-lg hover:shadow-xl"
-                  >
-                    INICIAR SESSÃO
-                  </button>
+
+                {/* Benefits Section */}
+                <div className="p-6">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                    Benefícios de Cliente
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg">
+                      <div className="p-2 bg-primary-100 rounded-lg">
+                        <ShoppingCart className="h-5 w-5 text-primary-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900 text-sm">Envio Grátis</h4>
+                        <p className="text-xs text-gray-600 mt-1">Em compras acima de 30€</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg">
+                      <div className="p-2 bg-primary-100 rounded-lg">
+                        <Package className="h-5 w-5 text-primary-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900 text-sm">Produtos Exclusivos</h4>
+                        <p className="text-xs text-gray-600 mt-1">Acesso a novos produtos em primeira mão</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg">
+                      <div className="p-2 bg-primary-100 rounded-lg">
+                        <Heart className="h-5 w-5 text-primary-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900 text-sm">Promoções Especiais</h4>
+                        <p className="text-xs text-gray-600 mt-1">Descontos e ofertas personalizadas</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </>
+            ) : (
+              <>
+                {/* Header - Authenticated */}
+                <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 flex flex-col justify-end p-8 pt-20 pb-10 relative overflow-hidden">
+                  {/* Decorative circles */}
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+                  <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
 
-            {/* Menu Items */}
-            <div className="p-6">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                A Minha Conta
-              </h3>
-              <div className="flex flex-col gap-2">
-                <Link
-                  to="/conta/dados-pessoais"
-                  onClick={handleCloseUserMenu}
-                  className="group flex items-center gap-4 p-4 rounded-xl hover:bg-primary-50 transition-all border border-transparent hover:border-primary-200"
-                >
-                  <div className="p-2 bg-primary-100 rounded-lg group-hover:bg-primary-200 transition-colors">
-                    <User className="h-5 w-5 text-primary-600" />
+                  <div className="relative z-10">
+                    <div className="inline-block p-3 bg-white/20 backdrop-blur-sm rounded-full mb-4">
+                      <User className="h-8 w-8 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white mb-2">
+                      Olá, {user?.name?.split(' ')[0]}!
+                    </h2>
+                    <p className="text-white/90 text-sm">
+                      {user?.email}
+                    </p>
+                    {user?.role === 'admin' && (
+                      <span className="inline-block mt-3 px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs font-medium text-white">
+                        Administrador
+                      </span>
+                    )}
                   </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
-                      Dados Pessoais
-                    </h4>
-                    <p className="text-xs text-gray-500">Gerir informação da conta</p>
-                  </div>
-                  <svg className="h-5 w-5 text-gray-400 group-hover:text-primary-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
+                </div>
 
-                <Link
-                  to="/conta/encomendas"
-                  onClick={handleCloseUserMenu}
-                  className="group flex items-center gap-4 p-4 rounded-xl hover:bg-primary-50 transition-all border border-transparent hover:border-primary-200"
-                >
-                  <div className="p-2 bg-primary-100 rounded-lg group-hover:bg-primary-200 transition-colors">
-                    <ShoppingCart className="h-5 w-5 text-primary-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
-                      Encomendas & Faturas
-                    </h4>
-                    <p className="text-xs text-gray-500">Ver histórico de compras</p>
-                  </div>
-                  <svg className="h-5 w-5 text-gray-400 group-hover:text-primary-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
+                {/* Menu Items - Authenticated */}
+                <div className="p-6">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                    A Minha Conta
+                  </h3>
+                  <div className="flex flex-col gap-2">
+                    <Link
+                      to="/perfil"
+                      onClick={handleCloseUserMenu}
+                      className="group flex items-center gap-4 p-4 rounded-xl hover:bg-primary-50 transition-all border border-transparent hover:border-primary-200"
+                    >
+                      <div className="p-2 bg-primary-100 rounded-lg group-hover:bg-primary-200 transition-colors">
+                        <UserCircle className="h-5 w-5 text-primary-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+                          Dados Pessoais
+                        </h4>
+                        <p className="text-xs text-gray-500">Gerir informação da conta</p>
+                      </div>
+                      <svg className="h-5 w-5 text-gray-400 group-hover:text-primary-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
 
-                <Link
-                  to="/conta/favoritos"
-                  onClick={handleCloseUserMenu}
-                  className="group flex items-center gap-4 p-4 rounded-xl hover:bg-primary-50 transition-all border border-transparent hover:border-primary-200"
-                >
-                  <div className="p-2 bg-primary-100 rounded-lg group-hover:bg-primary-200 transition-colors">
-                    <Heart className="h-5 w-5 text-primary-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
-                      Favoritos
-                    </h4>
-                    <p className="text-xs text-gray-500">Produtos guardados</p>
-                  </div>
-                  <svg className="h-5 w-5 text-gray-400 group-hover:text-primary-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-              </div>
+                    <Link
+                      to="/encomendas"
+                      onClick={handleCloseUserMenu}
+                      className="group flex items-center gap-4 p-4 rounded-xl hover:bg-primary-50 transition-all border border-transparent hover:border-primary-200"
+                    >
+                      <div className="p-2 bg-primary-100 rounded-lg group-hover:bg-primary-200 transition-colors">
+                        <Package className="h-5 w-5 text-primary-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+                          As Minhas Encomendas
+                        </h4>
+                        <p className="text-xs text-gray-500">Ver histórico de compras</p>
+                      </div>
+                      <svg className="h-5 w-5 text-gray-400 group-hover:text-primary-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
 
-              {/* Extra Info Section */}
-              <div className="mt-8 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                  <svg className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Benefícios de Cliente
-                </h4>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary-600 mt-0.5">✓</span>
-                    <span>Envio grátis em compras acima de 30€</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary-600 mt-0.5">✓</span>
-                    <span>Acesso exclusivo a novos produtos</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary-600 mt-0.5">✓</span>
-                    <span>Promoções especiais</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
+                    <Link
+                      to="/favoritos"
+                      onClick={handleCloseUserMenu}
+                      className="group flex items-center gap-4 p-4 rounded-xl hover:bg-primary-50 transition-all border border-transparent hover:border-primary-200"
+                    >
+                      <div className="p-2 bg-primary-100 rounded-lg group-hover:bg-primary-200 transition-colors">
+                        <Heart className="h-5 w-5 text-primary-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+                          Favoritos
+                        </h4>
+                        <p className="text-xs text-gray-500">Produtos guardados</p>
+                      </div>
+                      <svg className="h-5 w-5 text-gray-400 group-hover:text-primary-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
+
+                    {/* Admin Panel - Only for admins */}
+                    {user?.role === 'admin' && (
+                      <>
+                        <div className="border-t border-gray-200 my-3"></div>
+                        <Link
+                          to="/admin"
+                          onClick={handleCloseUserMenu}
+                          className="group flex items-center gap-4 p-4 rounded-xl bg-primary-50 border border-primary-200 hover:bg-primary-100 transition-all"
+                        >
+                          <div className="p-2 bg-primary-200 rounded-lg group-hover:bg-primary-300 transition-colors">
+                            <Settings className="h-5 w-5 text-primary-700" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-primary-700">
+                              Painel de Administrador
+                            </h4>
+                            <p className="text-xs text-primary-600">Gerir loja e produtos</p>
+                          </div>
+                          <svg className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Logout Button */}
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <button
+                      onClick={() => {
+                        logout();
+                        info('Sessão terminada. Até breve! 👋');
+                        handleCloseUserMenu();
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors font-medium"
+                    >
+                      <LogOut className="h-5 w-5" />
+                      Terminar Sessão
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </>
       )}

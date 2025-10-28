@@ -101,6 +101,52 @@
     animation: fadeOut 0.3s ease-out forwards;
   }
 
+  /* Progress bar shrink animation */
+  @keyframes shrink {
+    from {
+      width: 100%;
+    }
+    to {
+      width: 0%;
+    }
+  }
+
+  .animate-shrink {
+    animation: shrink linear forwards;
+  }
+
+  /* Scale in animation */
+  @keyframes scaleIn {
+    from {
+      transform: translate(-50%, -50%) scale(0.8);
+      opacity: 0;
+    }
+    to {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Scale out animation */
+  @keyframes scaleOut {
+    from {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+    to {
+      transform: translate(-50%, -50%) scale(0.8);
+      opacity: 0;
+    }
+  }
+
+  .animate-scaleIn {
+    animation: scaleIn 0.3s ease-out forwards;
+  }
+
+  .animate-scaleOut {
+    animation: scaleOut 0.3s ease-out forwards;
+  }
+
   /* Hide scrollbar for Chrome, Safari and Opera */
   .scrollbar-hide::-webkit-scrollbar {
     display: none;

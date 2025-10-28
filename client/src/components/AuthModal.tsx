@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import FloatingLabelInput from './FloatingLabelInput';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -9,6 +11,8 @@ interface AuthModalProps {
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'login' }) => {
+  const { isAuthenticated, login, register, user } = useAuth();
+  const { success, error: showError } = useToast();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [registerData, setRegisterData] = useState({ name: '', email: '', password: '' });
@@ -16,6 +20,13 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
   const [newsletter, setNewsletter] = useState(false);
   const [privacyPolicy, setPrivacyPolicy] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Swipe to close states
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [dragOffset, setDragOffset] = useState(0);
 
   // Password validation
   const validatePassword = (password: string) => {
@@ -52,19 +63,84 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
     setRegisterData({ ...registerData, [e.target.name]: e.target.value });
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login:', loginData, { rememberMe });
-    handleClose();
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      await login(loginData.email, loginData.password);
+      success(`Bem-vindo de volta! 👋`);
+      // Login successful - modal will close via useEffect
+    } catch (err) {
+      setError('Email ou password incorretos');
+      showError('Email ou password incorretos');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Register:', registerData, { newsletter, privacyPolicy });
-    handleClose();
+    setError(null);
+    setIsLoading(true);
+
+    if (!isPasswordValid) {
+      setError('A password não cumpre os requisitos mínimos');
+      showError('A password não cumpre os requisitos mínimos');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      await register(registerData.name, registerData.email, registerData.password);
+      success(`Conta criada com sucesso! Bem-vindo, ${registerData.name}! 🎉`);
+      // Register successful - modal will close via useEffect
+    } catch (err) {
+      setError('Erro ao criar conta. Email pode já estar em uso.');
+      showError('Erro ao criar conta. Email pode já estar em uso.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  if (!isOpen) return null;
+  // Swipe handlers for mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.innerWidth >= 768) return; // Only on mobile
+    setIsDragging(true);
+    setStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || window.innerWidth >= 768) return;
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - startX;
+    if (diff > 0) { // Only allow dragging to the right
+      setDragOffset(diff);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDragging || window.innerWidth >= 768) return;
+    setIsDragging(false);
+    const threshold = 100;
+
+    if (dragOffset > threshold) {
+      handleClose();
+    }
+    
+    setDragOffset(0);
+    setStartX(0);
+  };
+
+  // Close modal automatically when user logs in
+  React.useEffect(() => {
+    if (isAuthenticated && isOpen) {
+      handleClose();
+    }
+  }, [isAuthenticated, isOpen]);
+
+  if (!isOpen || isAuthenticated) return null;
 
   return (
     <>
@@ -78,6 +154,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
       <div
         className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-6xl bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl shadow-2xl z-[70] max-h-[90vh] overflow-hidden ${isClosing ? 'animate-fadeOut scale-95' : 'animate-fadeIn scale-100'} transition-all duration-300`}
         onClick={(e) => e.stopPropagation()}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          transform: isDragging 
+            ? `translate(calc(-50% + ${dragOffset}px), -50%)` 
+            : 'translate(-50%, -50%)',
+          transition: isDragging ? 'none' : 'all 0.3s',
+        }}
       >
         {/* Close Button */}
         <div className="absolute top-4 right-4 z-10">
@@ -99,6 +184,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
 
             {mode === 'login' ? (
               <form onSubmit={handleLoginSubmit} className="space-y-6 flex-1 flex flex-col">
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                    {error}
+                  </div>
+                )}
+
                 <FloatingLabelInput
                   id="login_email"
                   name="email"
@@ -157,9 +248,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
 
                   <button
                     type="submit"
-                    className="w-full bg-primary-600 text-white py-4 px-6 rounded-lg font-semibold text-sm uppercase hover:bg-primary-700 transition-colors shadow-lg hover:shadow-xl"
+                    disabled={isLoading}
+                    className="w-full bg-primary-600 text-white py-4 px-6 rounded-lg font-semibold text-sm uppercase hover:bg-primary-700 transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Iniciar Sessão
+                    {isLoading ? 'A iniciar sessão...' : 'Iniciar Sessão'}
                   </button>
                 </div>
               </form>
@@ -209,6 +301,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
 
             {mode === 'register' ? (
               <form onSubmit={handleRegisterSubmit} className="space-y-6 flex-1 flex flex-col">
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                    {error}
+                  </div>
+                )}
+
                 <FloatingLabelInput
                   id="register_name"
                   name="name"
@@ -344,9 +442,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
 
                   <button
                     type="submit"
-                    className="w-full bg-primary-600 text-white py-4 px-6 rounded-lg font-semibold text-sm uppercase hover:bg-primary-700 transition-colors shadow-lg hover:shadow-xl"
+                    disabled={isLoading || !isPasswordValid}
+                    className="w-full bg-primary-600 text-white py-4 px-6 rounded-lg font-semibold text-sm uppercase hover:bg-primary-700 transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Criar Conta
+                    {isLoading ? 'A criar conta...' : 'Criar Conta'}
                   </button>
                 </div>
               </form>

@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Filter, Search, Grid2x2 as Grid, List, Maximize2 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
+import SEO from '../components/SEO';
 import ProductCard from '../components/ProductCard';
 import FilterModal from '../components/FilterModal';
 import { mockProducts } from '../data/products';
+import { getItemListSchema, getBreadcrumbSchema } from '../utils/schemas';
 
 const PRODUCTS_PER_LOAD = 8;
 
@@ -80,6 +82,27 @@ const Shop: React.FC = () => {
     setDisplayCount(PRODUCTS_PER_LOAD);
   }, [searchTerm, selectedCategory, selectedColor, priceRange, sortBy]);
 
+  // SEO setup
+  const breadcrumbs = getBreadcrumbSchema([
+    { name: 'Início', url: '/' },
+    { name: 'Loja', url: '/loja' },
+  ]);
+
+  const itemListSchema = getItemListSchema(currentProducts);
+
+  const schemas = {
+    '@context': 'https://schema.org',
+    '@graph': [breadcrumbs, itemListSchema],
+  };
+
+  const pageTitle = selectedCategory
+    ? `${selectedCategory} - Loja de Crochê`
+    : 'Loja - Produtos em Crochê';
+
+  const pageDescription = selectedCategory
+    ? `Descubra nossa coleção de ${selectedCategory.toLowerCase()} em crochê. Peças únicas feitas à mão com qualidade superior.`
+    : 'Explore nossa loja online de produtos em crochê. Bolsas, roupas, acessórios e decoração feitos à mão com amor e dedicação.';
+
   const loadMore = () => {
     setDisplayCount(prev => prev + PRODUCTS_PER_LOAD);
   };
@@ -93,6 +116,13 @@ const Shop: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SEO
+        title={pageTitle}
+        description={pageDescription}
+        canonical="/loja"
+        ogType="website"
+        schema={schemas}
+      />
       <FilterModal
         isOpen={showFilters}
         onClose={() => setShowFilters(false)}
@@ -115,7 +145,7 @@ const Shop: React.FC = () => {
             Nossa Loja
           </h1>
           <p className="text-lg text-gray-600">
-            Explore todos os nossos produtos artesanais de crochê
+            Explore todos os nossos produtos de crochê
           </p>
         </div>
 

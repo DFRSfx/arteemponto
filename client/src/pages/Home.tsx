@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Star, Heart, Shield, Grid2x2, Maximize2 } from 'lucide-react';
+import SEO from '../components/SEO';
 import HeroSlider from '../components/HeroSlider';
 import ProductCard from '../components/ProductCard';
 import { mockProducts } from '../data/products';
+import { getOrganizationSchema, getWebSiteSchema } from '../utils/schemas';
 
 const Home: React.FC = () => {
   const [featuredViewMode, setFeaturedViewMode] = useState<'grid' | 'fullscreen'>('grid');
@@ -11,8 +13,21 @@ const Home: React.FC = () => {
   const featuredProducts = mockProducts.filter(product => product.featured).slice(0, 4);
   const newProducts = mockProducts.filter(product => product.new).slice(0, 3);
 
+  // Combine Organization and WebSite schemas
+  const schemas = {
+    '@context': 'https://schema.org',
+    '@graph': [getOrganizationSchema(), getWebSiteSchema()],
+  };
+
   return (
     <div className="min-h-screen">
+      <SEO
+        title="Crochê Feito à Mão"
+        description="Loja online de produtos em crochê. Peças únicas feitas com amor e dedicação. Descubra bolsas, roupas, acessórios e decoração em crochê de alta qualidade."
+        canonical="/"
+        ogType="website"
+        schema={schemas}
+      />
       {/* Hero Slider */}
       <HeroSlider />
 
@@ -166,7 +181,7 @@ const Home: React.FC = () => {
             Pronto para Descobrir?
           </h2>
           <p className="text-xl text-primary-100 mb-8">
-            Explore a nossa coleção completa de produtos artesanais de crochê
+            Explore a nossa coleção completa de produtos de crochê
           </p>
           <Link
             to="/loja"

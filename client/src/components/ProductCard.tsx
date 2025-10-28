@@ -101,10 +101,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
 
   if (viewMode === 'fullscreen') {
     return (
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden h-full flex flex-col">
+      <Link to={`/produto/${product.id}`} className="bg-white rounded-lg shadow-lg overflow-hidden h-full flex flex-col">
         <div className="relative group">
           <div
-            className="aspect-square overflow-hidden cursor-grab active:cursor-grabbing select-none relative"
+            className="aspect-square overflow-hidden cursor-pointer select-none relative"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -121,9 +121,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
               }}
             >
               {product.images.map((image, index) => (
-                <Link
+                <div
                   key={index}
-                  to={`/produto/${product.id}`}
                   className="w-full h-full flex-shrink-0"
                 >
                   <img
@@ -132,7 +131,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
                     className="w-full h-full object-cover pointer-events-none"
                     draggable={false}
                   />
-                </Link>
+                </div>
               ))}
             </div>
           </div>
@@ -184,25 +183,25 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
           {/* Action buttons */}
           {!hideActions && (
             <div className="absolute top-4 right-4 flex flex-col gap-2">
-              <button className="p-3 bg-white rounded-full shadow-lg hover:bg-primary-600 hover:scale-110 transition-all duration-300 group/heart">
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                className="p-3 bg-white rounded-full shadow-lg hover:bg-primary-600 hover:scale-110 transition-all duration-300 group/heart"
+              >
                 <Heart className="h-5 w-5 text-gray-600 group-hover/heart:text-white transition-colors" />
               </button>
-              <Link
-                to={`/produto/${product.id}`}
-                className="p-3 bg-white rounded-full shadow-lg hover:bg-primary-600 hover:scale-110 transition-all duration-300 group/eye"
-              >
-                <Eye className="h-5 w-5 text-gray-600 group-hover/eye:text-white transition-colors" />
-              </Link>
             </div>
           )}
         </div>
 
         <div className="p-6 flex-1 flex flex-col">
-          <Link to={`/produto/${product.id}`}>
+          <div>
             <h3 className="text-2xl font-medium text-gray-900 mb-3">
               {product.name}
             </h3>
-          </Link>
+          </div>
 
           <p className="text-base text-gray-600 mb-4 line-clamp-3">
             {product.description}
@@ -234,29 +233,29 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
               </span>
             </div>
 
-            <Link
-              to={`/produto/${product.id}`}
+            <div
+              onClick={(e) => e.stopPropagation()}
               className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-md text-lg font-medium transition-colors duration-200 ${
                 product.inStock
-                  ? 'bg-primary-600 text-white hover:bg-primary-700'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed pointer-events-none'
+                  ? 'bg-primary-600 text-white hover:bg-primary-700 cursor-pointer'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
               <ShoppingBag className="h-5 w-5" />
               {product.inStock ? 'Ver Produto' : 'Esgotado'}
-            </Link>
+            </div>
           </div>
         </div>
-      </div>
+      </Link>
     );
   }
 
   if (viewMode === 'list') {
     return (
-      <div className="group relative bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow duration-300 flex flex-row overflow-hidden">
+      <Link to={`/produto/${product.id}`} className="group relative bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow duration-300 flex flex-row overflow-hidden">
         <div className="flex-shrink-0 relative group/image">
           <div
-            className="w-48 h-48 overflow-hidden cursor-grab active:cursor-grabbing select-none relative"
+            className="w-48 h-48 overflow-hidden cursor-pointer select-none relative"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -273,9 +272,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
               }}
             >
               {product.images.map((image, index) => (
-                <Link
+                <div
                   key={index}
-                  to={`/produto/${product.id}`}
                   className="w-full h-full flex-shrink-0"
                 >
                   <img
@@ -284,7 +282,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
                     className="w-full h-full object-cover pointer-events-none"
                     draggable={false}
                   />
-                </Link>
+                </div>
               ))}
             </div>
           </div>
@@ -323,11 +321,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
         <div className="flex-1 p-6 flex flex-col justify-between">
           <div>
             <div className="flex items-start justify-between mb-2">
-              <Link to={`/produto/${product.id}`}>
+              <div>
                 <h3 className="text-xl font-medium text-gray-900 group-hover:text-primary-600 transition-colors">
                   {product.name}
                 </h3>
-              </Link>
+              </div>
 
               {/* Badges */}
               <div className="flex gap-2">
@@ -374,38 +372,38 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
             </span>
 
             <div className="flex items-center gap-3">
-              <button className="p-2 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors">
-                <Heart className="h-5 w-5 text-gray-600" />
-              </button>
-              <Link
-                to={`/produto/${product.id}`}
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
                 className="p-2 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors"
               >
-                <Eye className="h-5 w-5 text-gray-600" />
-              </Link>
-              <Link
-                to={`/produto/${product.id}`}
-                className={`flex items-center gap-2 py-2 px-6 rounded-md transition-colors duration-200 ${
+                <Heart className="h-5 w-5 text-gray-600" />
+              </button>
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className={`flex items-center gap-2 py-2 px-6 rounded-md transition-colors duration-200 cursor-pointer ${
                   product.inStock
                     ? 'bg-primary-600 text-white hover:bg-primary-700'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed pointer-events-none'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
                 <ShoppingBag className="h-4 w-4" />
                 {product.inStock ? 'Ver Produto' : 'Esgotado'}
-              </Link>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </Link>
     );
   }
 
   return (
     <div className="group relative bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow duration-300 flex flex-col h-full">
-      <div className="relative group/image">
+      <Link to={`/produto/${product.id}`} className="relative group/image">
         <div
-          className="aspect-square overflow-hidden rounded-t-lg cursor-grab active:cursor-grabbing select-none relative"
+          className="aspect-square overflow-hidden rounded-t-lg cursor-pointer select-none relative"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -422,9 +420,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
             }}
           >
             {product.images.map((image, index) => (
-              <Link
+              <div
                 key={index}
-                to={`/produto/${product.id}`}
                 className="w-full h-full flex-shrink-0"
               >
                 <img
@@ -433,7 +430,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
                   className="w-full h-full object-cover pointer-events-none"
                   draggable={false}
                 />
-              </Link>
+              </div>
             ))}
           </div>
         </div>
@@ -467,7 +464,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
             </div>
           </>
         )}
-      </div>
+      </Link>
 
       {/* Badges */}
       <div className="absolute top-2 left-2 flex flex-col gap-1 z-20">
@@ -486,24 +483,22 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
       {/* Action buttons */}
       {!hideActions && (
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col gap-2 z-20">
-          <button className="p-2 bg-white rounded-full shadow-md hover:bg-primary-600 hover:scale-110 transition-all duration-300 group/heart">
+          <button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            className="p-2 bg-white rounded-full shadow-md hover:bg-primary-600 hover:scale-110 transition-all duration-300 group/heart"
+          >
             <Heart className="h-4 w-4 text-gray-600 group-hover/heart:text-white transition-colors" />
           </button>
-          <Link
-            to={`/produto/${product.id}`}
-            className="p-2 bg-white rounded-full shadow-md hover:bg-primary-600 hover:scale-110 transition-all duration-300 group/eye"
-          >
-            <Eye className="h-4 w-4 text-gray-600 group-hover/eye:text-white transition-colors" />
-          </Link>
         </div>
       )}
 
-      <div className="p-4 flex flex-col flex-1">
-        <Link to={`/produto/${product.id}`}>
-          <h3 className="text-lg font-medium text-gray-900 mb-2 group-hover:text-primary-600 transition-colors">
-            {product.name}
-          </h3>
-        </Link>
+      <Link to={`/produto/${product.id}`} className="p-4 flex flex-col flex-1">
+        <h3 className="text-lg font-medium text-gray-900 mb-2 group-hover:text-primary-600 transition-colors">
+          {product.name}
+        </h3>
 
         <p className="text-sm text-gray-600 mb-3 line-clamp-2">
           {product.description}
@@ -532,19 +527,18 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
             </div>
           </div>
 
-          <Link
-            to={`/produto/${product.id}`}
+          <div
             className={`w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-md transition-colors duration-200 text-sm ${
               product.inStock
-                ? 'bg-primary-600 text-white hover:bg-primary-700'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed pointer-events-none'
+                ? 'bg-primary-600 text-white hover:bg-primary-700 cursor-pointer'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
             <ShoppingBag className="h-4 w-4 flex-shrink-0" />
             <span className="whitespace-nowrap">{product.inStock ? 'Ver Produto' : 'Esgotado'}</span>
-          </Link>
+          </div>
         </div>
-      </div>
+      </Link>
     </div>
   );
 };

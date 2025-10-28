@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, ArrowRight, Trash2 } from 'lucide-react';
+import SEO from '../components/SEO';
 import CartItem from '../components/CartItem';
 import { useCart } from '../context/CartContext';
 
@@ -10,6 +11,12 @@ const Cart: React.FC = () => {
   if (items.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <SEO
+          title="Carrinho de Compras"
+          description="Seu carrinho de compras está vazio. Explore nossa coleção de produtos em crochê feitos à mão."
+          canonical="/carrinho"
+          ogType="website"
+        />
         <div className="text-center max-w-md">
           <ShoppingBag className="h-24 w-24 text-gray-300 mx-auto mb-6" />
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
@@ -32,6 +39,12 @@ const Cart: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SEO
+        title="Carrinho de Compras"
+        description={`Seu carrinho contém ${itemCount} ${itemCount === 1 ? 'item' : 'itens'}. Finalize sua compra de produtos em crochê feitos à mão.`}
+        canonical="/carrinho"
+        ogType="website"
+      />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">

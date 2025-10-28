@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Smartphone, Banknote, Apple } from 'lucide-react';
+import SEO from '../components/SEO';
 import { useCart } from '../context/CartContext';
 
 const Checkout: React.FC = () => {
@@ -134,6 +135,12 @@ const Checkout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SEO
+        title="Checkout - Finalizar Compra"
+        description="Finalize sua compra de forma segura. Aceitamos Multibanco, MB WAY e cartão de crédito. Envio grátis acima de €30."
+        canonical="/checkout"
+        ogType="website"
+      />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">

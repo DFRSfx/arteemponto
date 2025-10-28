@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Phone, MapPin, Instagram, Send } from 'lucide-react';
+import SEO from '../components/SEO';
+import { getLocalBusinessSchema, getFAQSchema } from '../utils/schemas';
 
 const Contact: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -30,8 +32,40 @@ const Contact: React.FC = () => {
     });
   };
 
+  // SEO setup with FAQ schema
+  const faqs = [
+    {
+      question: 'Quanto tempo demora um pedido personalizado?',
+      answer: 'Os pedidos personalizados levam entre 2 a 4 semanas, dependendo da complexidade do projeto.',
+    },
+    {
+      question: 'Fazem entregas em todo o país?',
+      answer: 'Sim! Fazemos entregas em todo Portugal continental e ilhas. Envio grátis em compras acima de €30.',
+    },
+    {
+      question: 'Que materiais utilizam?',
+      answer: 'Utilizamos apenas linhas de alta qualidade, preferencialmente 100% algodão, adequadas para cada tipo de produto.',
+    },
+    {
+      question: 'Posso devolver um produto?',
+      answer: 'Sim, aceitamos devoluções até 30 dias após a compra, desde que o produto esteja em perfeitas condições.',
+    },
+  ];
+
+  const schemas = {
+    '@context': 'https://schema.org',
+    '@graph': [getLocalBusinessSchema(), getFAQSchema(faqs)],
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <SEO
+        title="Contacto"
+        description="Entre em contacto com Arte em Ponto. Estamos disponíveis para esclarecer dúvidas, fazer encomendas personalizadas e ajudar com qualquer questão sobre os nossos produtos em crochê."
+        canonical="/contacto"
+        ogType="website"
+        schema={schemas}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
         <div className="text-center mb-12">

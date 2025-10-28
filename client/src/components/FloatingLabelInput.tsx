@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, LucideIcon } from 'lucide-react';
 
 interface FloatingLabelInputProps {
   id: string;
   name: string;
-  type?: 'text' | 'email' | 'password';
+  type?: 'text' | 'email' | 'password' | 'tel';
   label: string;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   required?: boolean;
   autoComplete?: string;
+  disabled?: boolean;
+  icon?: LucideIcon;
 }
 
 const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
@@ -20,7 +22,9 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
   value,
   onChange,
   required = false,
-  autoComplete = 'off'
+  autoComplete = 'off',
+  disabled = false,
+  icon: Icon,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -35,6 +39,8 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
       <label
         htmlFor={id}
         className={`absolute left-5 bg-white px-2 transition-all duration-200 pointer-events-none ${
+          Icon ? 'left-14' : 'left-5'
+        } ${
           shouldFloat
             ? 'top-0 -translate-y-1/2 text-sm text-primary-600'
             : 'top-1/2 -translate-y-1/2 text-gray-500'
@@ -42,6 +48,15 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
       >
         {label} {required && '*'}
       </label>
+      
+      {Icon && (
+        <Icon
+          className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 transition-colors ${
+            disabled ? 'text-gray-300' : isFocused ? 'text-primary-600' : 'text-gray-400'
+          }`}
+        />
+      )}
+
       <input
         id={id}
         name={name}
@@ -51,9 +66,10 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         autoComplete={autoComplete}
-        className={`w-full p-5 border rounded-lg bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-          isPasswordField ? 'pr-12' : ''
-        }`}
+        disabled={disabled}
+        className={`w-full p-5 border rounded-lg bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500 ${
+          Icon ? 'pl-14' : 'pl-5'
+        } ${isPasswordField ? 'pr-12' : ''}`}
       />
       {isPasswordField && (
         <button
