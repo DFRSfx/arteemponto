@@ -7,6 +7,7 @@ import ProductForm from './pages/ProductForm';
 import OrdersList from './pages/OrdersList';
 import OrderDetails from './pages/OrderDetails';
 import CategoriesList from './pages/CategoriesList';
+import HeroSlidesList from './pages/HeroSlidesList';
 
 export default function AdminApp() {
   const { user, isAuthenticated } = useAuth();
@@ -33,12 +34,13 @@ export default function AdminApp() {
     <AdminLayout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/products" element={<ProductsList />} />
-        <Route path="/products/new" element={<ProductForm />} />
-        <Route path="/products/edit/:id" element={<ProductForm />} />
-        <Route path="/orders" element={<OrdersList />} />
-        <Route path="/orders/:id" element={<OrderDetails />} />
-        <Route path="/categories" element={<CategoriesList />} />
+        <Route path="/categorias" element={<CategoriesList />} />
+        <Route path="/produtos" element={<ProductsList />} />
+        <Route path="/produtos/novo" element={<ProductForm />} />
+        <Route path="/produtos/editar/:id" element={<ProductForm />} />
+        <Route path="/encomendas" element={<OrdersList />} />
+        <Route path="/encomendas/:id" element={<OrderDetails />} />
+        <Route path="/hero-slides" element={<HeroSlidesList />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </AdminLayout>

@@ -9,8 +9,8 @@ import {
   Menu,
   LogOut,
   User,
-  Bell,
-  Settings
+  ArrowLeft,
+  Image
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -23,10 +23,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const { user, logout } = useAuth();
 
   const menuItems = [
-    { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-    { name: 'Produtos', path: '/admin/products', icon: Package },
-    { name: 'Encomendas', path: '/admin/orders', icon: ShoppingCart },
-    { name: 'Categorias', path: '/admin/categories', icon: FolderOpen },
+    { name: 'Painel', path: '/admin', icon: LayoutDashboard },
+    { name: 'Hero Slides', path: '/admin/hero-slides', icon: Image },
+    { name: 'Categorias', path: '/admin/categorias', icon: FolderOpen },
+    { name: 'Produtos', path: '/admin/produtos', icon: Package },
+    { name: 'Encomendas', path: '/admin/encomendas', icon: ShoppingCart },
   ];
 
   const isActive = (path: string) => {
@@ -55,17 +56,28 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         {/* Logo */}
-        <div className="h-16 flex items-center px-6 border-b border-gray-200 flex-shrink-0">
-          <img 
-            src="/logo.png" 
-            alt="Arte em Ponto" 
-            className="h-8"
+        <div className="h-24 flex items-center px-6 border-b border-gray-200 flex-shrink-0">
+          <img
+            src="images/logo.webp"
+            alt="Arte em Ponto"
+            className="h-20 w-auto"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
               e.currentTarget.nextElementSibling?.classList.remove('hidden');
             }}
           />
           <h1 className="text-xl font-bold text-gray-900 hidden">Arte em Ponto</h1>
+        </div>
+
+        {/* Back to Website Link */}
+        <div className="p-4 border-b border-gray-200 flex-shrink-0">
+          <Link
+            to="/"
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-primary-600 hover:bg-primary-50 transition-colors font-medium"
+          >
+            <ArrowLeft size={20} />
+            <span>Voltar ao Website</span>
+          </Link>
         </div>
 
         {/* Navigation */}
@@ -81,7 +93,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 className={`
                   flex items-center gap-3 px-4 py-3 rounded-lg transition-colors
                   ${active 
-                    ? 'bg-amber-50 text-amber-700 font-medium' 
+                    ? 'bg-primary-50 text-primary-700 font-medium' 
                     : 'text-gray-700 hover:bg-gray-50'
                   }
                 `}
@@ -96,7 +108,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* User section */}
         <div className="p-4 border-t border-gray-200 flex-shrink-0">
           <div className="flex items-center gap-3 mb-3 px-4 py-2">
-            <div className="w-8 h-8 bg-amber-600 rounded-full flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
               <User size={16} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
@@ -106,7 +118,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 active:bg-gray-100 rounded-lg transition-colors touch-manipulation min-h-[44px]"
           >
             <LogOut size={18} />
             <span className="text-sm">Terminar Sessão</span>
@@ -120,22 +132,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            className="lg:hidden p-3 -ml-2 text-gray-600 hover:bg-gray-100 active:bg-gray-200 rounded-lg touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Abrir menu"
           >
             <Menu size={24} />
           </button>
 
           <div className="flex-1"></div>
-
-          <div className="flex items-center gap-4">
-            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg relative">
-              <Bell size={20} />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
-            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg">
-              <Settings size={20} />
-            </button>
-          </div>
         </header>
 
         {/* Page content */}

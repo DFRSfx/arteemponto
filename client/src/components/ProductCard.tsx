@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { ShoppingBag, Heart, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Product } from '../types';
 import { useCart } from '../context/CartContext';
+import { useFavorites } from '../context/FavoritesContext';
+import { getAbsoluteImageUrl } from '../utils/imageUtils';
 
 interface ProductCardProps {
   product: Product;
@@ -12,10 +14,24 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', hideActions = false }) => {
   const { addItem } = useCart();
+  const { favorites, addToFavorites, removeFromFavorites } = useFavorites();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
+
+  const isFavorite = favorites.some(fav => fav.product_id === product.id);
+
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isFavorite) {
+      await removeFromFavorites(product.id);
+    } else {
+      await addToFavorites(product.id);
+    }
+  };
 
   const handlePrevImage = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -126,7 +142,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
                   className="w-full h-full flex-shrink-0"
                 >
                   <img
-                    src={image}
+                    src={getAbsoluteImageUrl(image)}
                     alt={`${product.name} - ${index + 1}`}
                     className="w-full h-full object-cover pointer-events-none"
                     draggable={false}
@@ -167,14 +183,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
           )}
 
           {/* Badges */}
-          <div className="absolute top-4 left-4 flex flex-col gap-2">
+          <div className="absolute top-4 left-4 flex flex-row gap-2 flex-wrap">
             {product.new && (
-              <span className="bg-secondary-500 text-white text-sm px-3 py-1.5 rounded-full">
+              <span className="bg-secondary-500 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
                 Novo
               </span>
             )}
             {product.featured && (
-              <span className="bg-tertiary-500 text-white text-sm px-3 py-1.5 rounded-full">
+              <span className="bg-tertiary-500 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
                 Destaque
               </span>
             )}
@@ -184,13 +200,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
           {!hideActions && (
             <div className="absolute top-4 right-4 flex flex-col gap-2">
               <button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                className="p-3 bg-white rounded-full shadow-lg hover:bg-primary-600 hover:scale-110 transition-all duration-300 group/heart"
+                onClick={handleToggleFavorite}
+                className={`p-3 rounded-full shadow-lg hover:scale-110 transition-all duration-300 ${
+                  isFavorite 
+                    ? 'bg-primary-600 text-white' 
+                    : 'bg-white text-gray-600 hover:bg-primary-600 hover:text-white'
+                }`}
               >
-                <Heart className="h-5 w-5 text-gray-600 group-hover/heart:text-white transition-colors" />
+                <Heart className={`h-5 w-5 transition-colors ${isFavorite ? 'fill-current' : ''}`} />
               </button>
             </div>
           )}
@@ -277,7 +294,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
                   className="w-full h-full flex-shrink-0"
                 >
                   <img
-                    src={image}
+                    src={getAbsoluteImageUrl(image)}
                     alt={`${product.name} - ${index + 1}`}
                     className="w-full h-full object-cover pointer-events-none"
                     draggable={false}
@@ -328,14 +345,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
               </div>
 
               {/* Badges */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {product.new && (
-                  <span className="bg-secondary-500 text-white text-xs px-2 py-1 rounded-full">
+                  <span className="bg-secondary-500 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
                     Novo
                   </span>
                 )}
                 {product.featured && (
-                  <span className="bg-tertiary-500 text-white text-xs px-2 py-1 rounded-full">
+                  <span className="bg-tertiary-500 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
                     Destaque
                   </span>
                 )}
@@ -373,13 +390,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
 
             <div className="flex items-center gap-3">
               <button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                className="p-2 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors"
+                onClick={handleToggleFavorite}
+                className={`p-2 border rounded-full transition-colors ${
+                  isFavorite
+                    ? 'border-primary-600 bg-primary-50 text-primary-600'
+                    : 'border-gray-300 hover:bg-gray-50'
+                }`}
               >
-                <Heart className="h-5 w-5 text-gray-600" />
+                <Heart className={`h-5 w-5 ${isFavorite ? 'fill-current text-primary-600' : 'text-gray-600'}`} />
               </button>
               <div
                 onClick={(e) => e.stopPropagation()}
@@ -425,7 +443,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
                 className="w-full h-full flex-shrink-0"
               >
                 <img
-                  src={image}
+                  src={getAbsoluteImageUrl(image)}
                   alt={`${product.name} - ${index + 1}`}
                   className="w-full h-full object-cover pointer-events-none"
                   draggable={false}
@@ -467,14 +485,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
       </Link>
 
       {/* Badges */}
-      <div className="absolute top-2 left-2 flex flex-col gap-1 z-20">
+      <div className="absolute top-2 left-2 flex flex-row gap-2 flex-wrap z-20">
         {product.new && (
-          <span className="bg-secondary-500 text-white text-xs px-2 py-1 rounded-full">
+          <span className="bg-secondary-500 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
             Novo
           </span>
         )}
         {product.featured && (
-          <span className="bg-tertiary-500 text-white text-xs px-2 py-1 rounded-full">
+          <span className="bg-tertiary-500 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
             Destaque
           </span>
         )}
@@ -484,13 +502,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
       {!hideActions && (
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col gap-2 z-20">
           <button 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            className="p-2 bg-white rounded-full shadow-md hover:bg-primary-600 hover:scale-110 transition-all duration-300 group/heart"
+            onClick={handleToggleFavorite}
+            className={`p-2 rounded-full shadow-md hover:scale-110 transition-all duration-300 ${
+              isFavorite 
+                ? 'bg-primary-600 text-white' 
+                : 'bg-white text-gray-600 hover:bg-primary-600 hover:text-white'
+            }`}
           >
-            <Heart className="h-4 w-4 text-gray-600 group-hover/heart:text-white transition-colors" />
+            <Heart className={`h-4 w-4 transition-colors ${isFavorite ? 'fill-current' : ''}`} />
           </button>
         </div>
       )}

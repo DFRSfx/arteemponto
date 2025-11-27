@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
 import pool from '../config/database.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
+import EmailVerification from '../models/EmailVerification.js';
 
 const router = express.Router();
 
@@ -41,32 +42,36 @@ router.post(
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Create user
+      // Create user with email_verified = FALSE and pending status
       const [result]: any = await pool.query(
-        'INSERT INTO users (email, password, name, role, status) VALUES (?, ?, ?, ?, ?)',
-        [email, hashedPassword, name, 'customer', 'active']
+        'INSERT INTO users (email, password, name, role, status, email_verified) VALUES (?, ?, ?, ?, ?, ?)',
+        [email, hashedPassword, name, 'customer', 'pending', false]
       );
 
-      // Generate JWT token
-      const token = jwt.sign(
-        {
-          userId: result.insertId,
-          email,
-          role: 'customer'
-        },
-        process.env.JWT_SECRET!,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-      );
+      const userId = result.insertId;
 
+      // Create verification token
+      const { token: verificationToken, success } = await EmailVerification.createVerificationToken(userId, email);
+      
+      if (!success) {
+        // Rollback - delete user if token creation fails
+        await pool.query('DELETE FROM users WHERE id = ?', [userId]);
+        res.status(500).json({ error: 'Erro ao criar token de verificação' });
+        return;
+      }
+
+      // Send verification email
+      const emailSent = await EmailVerification.sendVerificationEmail(email, verificationToken, name, 'pt');
+      
+      if (!emailSent) {
+        console.error('Failed to send verification email, but user created');
+      }
+
+      // NÃO retornar token - user precisa verificar email primeiro
       res.status(201).json({
-        message: 'Utilizador criado com sucesso',
-        token,
-        user: {
-          id: result.insertId,
-          email,
-          name,
-          role: 'customer'
-        }
+        message: 'Conta criada! Por favor, verifique o seu email para ativar a conta.',
+        email,
+        requiresEmailVerification: true
       });
     } catch (error) {
       console.error('Register error:', error);
@@ -94,7 +99,7 @@ router.post(
 
       // Find user
       const [rows]: any = await pool.query(
-        'SELECT id, email, password, name, role, status FROM users WHERE email = ?',
+        'SELECT id, email, password, name, role, status, email_verified FROM users WHERE email = ?',
         [email]
       );
 
@@ -105,9 +110,19 @@ router.post(
 
       const user = rows[0];
 
-      // Check if account is active
-      if (user.status !== 'active') {
+      // Check if account is active or pending (pending is allowed if email is verified)
+      if (user.status === 'suspended' || user.status === 'inactive') {
         res.status(401).json({ error: 'Conta suspensa ou inativa' });
+        return;
+      }
+
+      // BLOQUEAR login se email NÃO está verificado (independente do status)
+      if (!user.email_verified) {
+        res.status(401).json({ 
+          error: 'Por favor, verifique o seu email antes de fazer login',
+          requiresEmailVerification: true,
+          email: user.email
+        });
         return;
       }
 
@@ -120,13 +135,16 @@ router.post(
       }
 
       // Generate JWT token
+      const jwtSecret = process.env.JWT_SECRET || 'default-secret';
+      // @ts-ignore - JWT typing issue with expiresIn
       const token = jwt.sign(
         {
           userId: user.id,
           email: user.email,
-          role: user.role
+          role: user.role,
+          emailVerified: user.email_verified
         },
-        process.env.JWT_SECRET!,
+        jwtSecret,
         { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
       );
 
@@ -137,7 +155,8 @@ router.post(
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role
+          role: user.role,
+          emailVerified: user.email_verified
         }
       });
     } catch (error) {
@@ -178,6 +197,54 @@ router.post('/verify', authenticateToken, (req: AuthRequest, res) => {
     valid: true,
     user: req.user
   });
+});
+
+// Verify email with token
+router.post('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      res.status(400).json({ error: 'Token é obrigatório' });
+      return;
+    }
+
+    const result = await EmailVerification.verifyEmailToken(token);
+
+    if (!result.success) {
+      res.status(400).json({ error: result.message });
+      return;
+    }
+
+    res.json({ message: result.message });
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ error: 'Erro ao verificar email' });
+  }
+});
+
+// Resend verification email
+router.post('/resend-verification', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      res.status(400).json({ error: 'Email é obrigatório' });
+      return;
+    }
+
+    const result = await EmailVerification.resendVerificationEmail(email);
+
+    if (!result.success) {
+      res.status(400).json({ error: result.message });
+      return;
+    }
+
+    res.json({ message: result.message });
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({ error: 'Erro ao reenviar email de verificação' });
+  }
 });
 
 export default router;

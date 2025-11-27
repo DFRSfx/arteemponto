@@ -1,11 +1,28 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Smartphone, Banknote, Apple } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, CreditCard, Smartphone, Banknote, MapPin, Plus, User, Mail, AlertCircle } from 'lucide-react';
 import SEO from '../components/SEO';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import AuthModal from '../components/AuthModal';
+
+interface ShippingAddress {
+  id: number;
+  name: string;
+  address: string;
+  city: string;
+  postal_code: string;
+  phone: string;
+  is_default: boolean;
+}
 
 const Checkout: React.FC = () => {
   const { items, total, clearCart } = useCart();
+  const { isAuthenticated, user } = useAuth();
+  const { success, error: showError } = useToast();
+  const navigate = useNavigate();
+
   const [selectedPayment, setSelectedPayment] = useState('multibanco');
   const [customerInfo, setCustomerInfo] = useState({
     name: '',
@@ -17,29 +34,205 @@ const Checkout: React.FC = () => {
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentReference, setPaymentReference] = useState<any>(null);
+  const [savedAddresses, setSavedAddresses] = useState<ShippingAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+  const [showNewAddressForm, setShowNewAddressForm] = useState(true);
+  const [saveAddress, setSaveAddress] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showGuestWarning, setShowGuestWarning] = useState(false);
+  const [trackingToken, setTrackingToken] = useState<string>('');
 
   const finalTotal = total * 1.23; // Including VAT
+  const API_BASE_URL = '/api';
+
+  // Load saved addresses if authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadSavedAddresses();
+      // Pre-fill name and email from user account
+      setCustomerInfo(prev => ({
+        ...prev,
+        name: user?.name || '',
+        email: user?.email || ''
+      }));
+    } else {
+      // Show guest warning after 2 seconds
+      const timer = setTimeout(() => {
+        setShowGuestWarning(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, user]);
+
+  // Load saved addresses from localStorage for guests
+  useEffect(() => {
+    if (!isAuthenticated) {
+      const savedData = localStorage.getItem('guest_checkout_data');
+      if (savedData) {
+        const parsed = JSON.parse(savedData);
+        setCustomerInfo(parsed);
+      }
+    }
+  }, [isAuthenticated]);
+
+  const loadSavedAddresses = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/shipping-addresses`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const addresses = await response.json();
+        setSavedAddresses(addresses);
+        
+        // Auto-select default address
+        const defaultAddr = addresses.find((addr: ShippingAddress) => addr.is_default);
+        if (defaultAddr) {
+          setSelectedAddressId(defaultAddr.id);
+          selectAddress(defaultAddr);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading addresses:', error);
+    }
+  };
+
+  const selectAddress = (addr: ShippingAddress) => {
+    setCustomerInfo(prev => ({
+      ...prev, // Mantém name e email
+      address: addr.address,
+      city: addr.city,
+      postalCode: addr.postal_code,
+      phone: addr.phone
+    }));
+    
+    setShowNewAddressForm(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    // Simulate API call to create payment reference
-    setTimeout(() => {
-      const mockReference = {
-        entity: '12345',
-        reference: '123 456 789',
-        value: finalTotal,
-        method: selectedPayment,
-        qrCode: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    try {
+      // Validate required fields
+      if (!customerInfo.name || !customerInfo.email || !customerInfo.phone || 
+          !customerInfo.address || !customerInfo.city || !customerInfo.postalCode) {
+        showError('Por favor preencha todos os campos obrigatórios');
+        setIsProcessing(false);
+        return;
+      }
+
+      // Save guest data to localStorage
+      if (!isAuthenticated) {
+        localStorage.setItem('guest_checkout_data', JSON.stringify(customerInfo));
+      }
+
+      // Create order
+      const orderData = {
+        customer_name: customerInfo.name,
+        customer_email: customerInfo.email,
+        customer_phone: customerInfo.phone,
+        customer_address: customerInfo.address,
+        customer_city: customerInfo.city,
+        customer_postal_code: customerInfo.postalCode,
+        payment_method: selectedPayment,
+        items: items.map(item => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+          price: item.product.price
+        })),
+        user_id: user?.id || null,
+        save_address: isAuthenticated && saveAddress
       };
-      
-      setPaymentReference(mockReference);
+
+      const orderResponse = await fetch(`${API_BASE_URL}/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(orderData)
+      });
+
+      if (!orderResponse.ok) {
+        throw new Error('Failed to create order');
+      }
+
+      const order = await orderResponse.json();
+      setTrackingToken(order.tracking_token);
+
+      // Generate payment reference or redirect for credit card
+      if (selectedPayment === 'card') {
+        // Credit Card payment - redirect to Eupago payment form
+        const paymentResponse = await fetch(`${API_BASE_URL}/payment/creditcard`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            amount: finalTotal,
+            email: customerInfo.email,
+            order_id: order.id
+          })
+        });
+
+        if (!paymentResponse.ok) {
+          throw new Error('Failed to generate payment form');
+        }
+
+        const paymentData = await paymentResponse.json();
+
+        // Clear cart and redirect to payment form
+        clearCart();
+        success('A redirecionar para o pagamento...');
+
+        // Redirect to Eupago payment form
+        window.location.href = paymentData.paymentUrl;
+        return;
+      } else {
+        // Multibanco or MB WAY - show payment reference
+        const paymentEndpoint = selectedPayment === 'multibanco' ? '/payment/multibanco' : '/payment/mbway';
+        const paymentResponse = await fetch(`${API_BASE_URL}${paymentEndpoint}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            amount: finalTotal,
+            email: customerInfo.email,
+            phone: customerInfo.phone,
+            order_id: order.id
+          })
+        });
+
+        if (!paymentResponse.ok) {
+          throw new Error('Failed to generate payment reference');
+        }
+
+        const paymentData = await paymentResponse.json();
+
+        setPaymentReference({
+          ...paymentData,
+          method: selectedPayment,
+          value: finalTotal,
+          orderId: order.id,
+          trackingToken: order.tracking_token
+        });
+
+        success('Pedido criado com sucesso!');
+        clearCart();
+      }
+    } catch (error: any) {
+      console.error('Error processing order:', error);
+      showError(error.message || 'Erro ao processar pedido');
+    } finally {
       setIsProcessing(false);
-    }, 2000);
+    }
   };
 
-  if (items.length === 0) {
+  if (items.length === 0 && !paymentReference) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -57,6 +250,12 @@ const Checkout: React.FC = () => {
   if (paymentReference) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <SEO
+          title="Pedido Criado com Sucesso"
+          description="O seu pedido foi criado com sucesso"
+          canonical="/checkout"
+          ogType="website"
+        />
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -99,14 +298,31 @@ const Checkout: React.FC = () => {
 
               {paymentReference.method === 'mbway' && (
                 <div className="text-center">
-                  <p className="mb-4">Código QR para pagamento MB WAY:</p>
-                  <div className="w-48 h-48 bg-gray-200 rounded-lg mx-auto mb-4 flex items-center justify-center">
-                    <span className="text-gray-500">QR Code</span>
-                  </div>
-                  <p className="font-mono text-lg">{paymentReference.value.toFixed(2)}€</p>
+                  <p className="mb-4">Verifique a sua app MB WAY para autorizar o pagamento</p>
+                  <p className="font-mono text-lg font-bold">{paymentReference.value.toFixed(2)}€</p>
+                  <p className="text-sm text-gray-600 mt-2">{paymentReference.message}</p>
                 </div>
               )}
             </div>
+
+            {!isAuthenticated && (
+              <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 text-left">
+                <div className="flex items-start">
+                  <Mail className="h-5 w-5 text-blue-400 mr-3 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="text-sm font-bold text-blue-800 mb-1">
+                      📧 Link de Tracking Enviado
+                    </h4>
+                    <p className="text-xs text-blue-700 mb-2">
+                      Enviámos um email para <strong>{customerInfo.email}</strong> com um link único para acompanhar a sua encomenda.
+                    </p>
+                    <p className="text-xs text-blue-600">
+                      Guarde este email para consultar o estado da sua encomenda a qualquer momento.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="text-sm text-gray-600 mb-6">
               <p>O seu pedido será processado automaticamente após confirmação do pagamento.</p>
@@ -120,12 +336,14 @@ const Checkout: React.FC = () => {
               >
                 Voltar ao Início
               </Link>
-              <button
-                onClick={clearCart}
-                className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-md hover:bg-gray-50 transition-colors"
-              >
-                Novo Pedido
-              </button>
+              {isAuthenticated && (
+                <Link
+                  to="/encomendas"
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-md hover:bg-gray-50 transition-colors"
+                >
+                  Ver Encomendas
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -137,7 +355,7 @@ const Checkout: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <SEO
         title="Checkout - Finalizar Compra"
-        description="Finalize sua compra de forma segura. Aceitamos Multibanco, MB WAY e cartão de crédito. Envio grátis acima de €30."
+        description="Finalize sua compra de forma segura. Aceitamos Multibanco, MB WAY e cartão de crédito."
         canonical="/checkout"
         ogType="website"
       />
@@ -157,97 +375,230 @@ const Checkout: React.FC = () => {
           Finalizar Compra
         </h1>
 
+        {/* Guest Warning */}
+        {showGuestWarning && !isAuthenticated && (
+          <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <User className="h-8 w-8 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  💡 Crie uma conta para uma melhor experiência!
+                </h3>
+                <p className="text-sm text-gray-700 mb-4">
+                  Ao criar conta, poderá:
+                </p>
+                <ul className="space-y-2 mb-4">
+                  <li className="flex items-center gap-2 text-sm text-gray-700">
+                    <span className="text-green-600">✓</span>
+                    <span>Guardar endereços de entrega para compras futuras</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm text-gray-700">
+                    <span className="text-green-600">✓</span>
+                    <span>Ver histórico completo de encomendas</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm text-gray-700">
+                    <span className="text-green-600">✓</span>
+                    <span>Acompanhar encomendas sem precisar de links</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm text-gray-700">
+                    <span className="text-green-600">✓</span>
+                    <span>Receber ofertas personalizadas</span>
+                  </li>
+                </ul>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowAuthModal(true)}
+                    className="px-6 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 transition-colors"
+                  >
+                    Criar Conta Agora
+                  </button>
+                  <button
+                    onClick={() => setShowGuestWarning(false)}
+                    className="px-6 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    Continuar como Convidado
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  Sem conta, receberá um link por email para acompanhar a encomenda
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Checkout Form */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Customer Information */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Informações Pessoais</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nome Completo *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={customerInfo.name}
-                      onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-                    />
+              {/* Saved Addresses - Only for authenticated users */}
+              {isAuthenticated && savedAddresses.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Moradas Guardadas</h3>
+                  <div className="space-y-2 mb-4">
+                    {savedAddresses.map((addr) => (
+                      <label
+                        key={addr.id}
+                        className={`flex items-start p-4 border rounded-md cursor-pointer transition-colors ${
+                          selectedAddressId === addr.id
+                            ? 'border-primary-600 bg-primary-50'
+                            : 'border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="address"
+                          checked={selectedAddressId === addr.id}
+                          onChange={() => {
+                            setSelectedAddressId(addr.id);
+                            selectAddress(addr);
+                          }}
+                          className="mt-1 mr-3"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{addr.name}</span>
+                            {addr.is_default && (
+                              <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded">
+                                Predefinida
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600">{addr.address}</p>
+                          <p className="text-sm text-gray-600">
+                            {addr.postal_code} {addr.city}
+                          </p>
+                          <p className="text-sm text-gray-600">{addr.phone}</p>
+                        </div>
+                      </label>
+                    ))}
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={customerInfo.email}
-                      onChange={(e) => setCustomerInfo({...customerInfo, email: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Telefone *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={customerInfo.phone}
-                      onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNewAddressForm(!showNewAddressForm);
+                      setSelectedAddressId(null);
+                    }}
+                    className="flex items-center gap-2 text-primary-600 hover:text-primary-700 text-sm font-medium"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {showNewAddressForm ? 'Usar morada guardada' : 'Usar nova morada'}
+                  </button>
                 </div>
-              </div>
+              )}
 
-              {/* Shipping Address */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Endereço de Entrega</h3>
-                <div className="space-y-4">
+              {/* Customer Information */}
+              {(showNewAddressForm || savedAddresses.length === 0) && (
+                <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Endereço *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={customerInfo.address}
-                      onChange={(e) => setCustomerInfo({...customerInfo, address: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Cidade *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={customerInfo.city}
-                        onChange={(e) => setCustomerInfo({...customerInfo, city: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-                      />
+                    <h3 className="text-lg font-semibold mb-4">Informações Pessoais</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Nome Completo *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={customerInfo.name}
+                          onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Email *
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          value={customerInfo.email}
+                          onChange={(e) => setCustomerInfo({...customerInfo, email: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Telefone *
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          value={customerInfo.phone}
+                          onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
+                          placeholder="912345678"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Código Postal *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={customerInfo.postalCode}
-                        onChange={(e) => setCustomerInfo({...customerInfo, postalCode: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-                      />
-                    </div>
                   </div>
-                </div>
-              </div>
+
+                  {/* Shipping Address */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Endereço de Entrega</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Endereço *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={customerInfo.address}
+                          onChange={(e) => setCustomerInfo({...customerInfo, address: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Cidade *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={customerInfo.city}
+                            onChange={(e) => setCustomerInfo({...customerInfo, city: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Código Postal *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={customerInfo.postalCode}
+                            onChange={(e) => setCustomerInfo({...customerInfo, postalCode: e.target.value})}
+                            placeholder="1234-567"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Save Address Checkbox - Only for authenticated users */}
+                    {isAuthenticated && showNewAddressForm && (
+                      <div className="mt-4">
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={saveAddress}
+                            onChange={(e) => setSaveAddress(e.target.checked)}
+                            className="w-4 h-4 text-primary-600 bg-gray-50 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">
+                            Guardar esta morada para futuras compras
+                          </span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
 
               {/* Payment Methods */}
               <div>
@@ -279,30 +630,17 @@ const Checkout: React.FC = () => {
                     <span className="font-medium">MB WAY</span>
                   </label>
 
-                  <label className="flex items-center p-4 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 opacity-50">
+                  <label className="flex items-center p-4 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
                     <input
                       type="radio"
                       name="payment"
                       value="card"
-                      disabled
+                      checked={selectedPayment === 'card'}
+                      onChange={(e) => setSelectedPayment(e.target.value)}
                       className="mr-3"
                     />
                     <CreditCard className="h-6 w-6 mr-3 text-gray-600" />
-                    <span className="font-medium">Cartão de Crédito</span>
-                    <span className="ml-auto text-xs text-gray-500">Em breve</span>
-                  </label>
-
-                  <label className="flex items-center p-4 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 opacity-50">
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="apple_pay"
-                      disabled
-                      className="mr-3"
-                    />
-                    <Apple className="h-6 w-6 mr-3 text-gray-600" />
-                    <span className="font-medium">Apple Pay</span>
-                    <span className="ml-auto text-xs text-gray-500">Em breve</span>
+                    <span className="font-medium">Cartão de Crédito/Débito</span>
                   </label>
                 </div>
               </div>
@@ -359,6 +697,13 @@ const Checkout: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialMode="register"
+      />
     </div>
   );
 };

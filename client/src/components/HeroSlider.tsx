@@ -11,40 +11,11 @@ interface SlideData {
   backgroundImage: string;
   textColor?: 'white' | 'dark';
 }
-{/*backgroundImage: 'https://mercadurumi.pt/wp-content/uploads/2025/06/Banner-Spesso1-Home.jpg', */}
-{/*backgroundImage: 'https://mercadurumi.pt/wp-content/uploads/2025/03/Banner-Clea500-saldo.jpg', */}
-{/*backgroundImage: 'https://mercadurumi.pt/wp-content/uploads/2024/09/Carrossel-Papier.jpg', */}
-const slides: SlideData[] = [
-  {
-    id: 1,
-    title: 'Algo por escrever aqui',  
-    description: 'Algo por escrever aqui.',
-    buttonText: 'Algo por escrever aqui',
-    buttonLink: '/loja', 
-    backgroundImage: 'https://image.slidesdocs.com/responsive-images/background/top-down-view-of-colorful-crochet-texture-powerpoint-background_d298c47843__960_540.jpg', 
-    textColor: 'white'
-  },
-  {
-    id: 2,
-    title: 'Algo por escrever aqui',
-    description: 'Algo por escrever aqui.',
-    buttonText: 'Ver Produtos',
-    buttonLink: '/loja',
-    backgroundImage: 'https://image.slidesdocs.com/responsive-images/background/top-down-view-of-colorful-crochet-texture-powerpoint-background_d298c47843__960_540.jpg', 
-    textColor: 'white'
-  },
-  {
-    id: 3,
-    title: 'Algo por escrever aqui',
-    description: 'Algo por escrever aqui.',
-    buttonText: 'Algo por escrever aqui',
-    buttonLink: '/loja?filter=featured',
-    backgroundImage: 'https://image.slidesdocs.com/responsive-images/background/top-down-view-of-colorful-crochet-texture-powerpoint-background_d298c47843__960_540.jpg',  
-    textColor: 'white'
-  }
-];
 
 const HeroSlider: React.FC = () => {
+  const [slides, setSlides] = useState<SlideData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [imagesLoaded, setImagesLoaded] = useState<Set<number>>(new Set());
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [touchStart, setTouchStart] = useState(0);
@@ -52,16 +23,62 @@ const HeroSlider: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
 
+  // Fetch slides from API
+  useEffect(() => {
+    const fetchSlides = async () => {
+      try {
+        const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
+        const response = await fetch(`${API_BASE}/hero-slides`);
+        if (response.ok) {
+          const data = await response.json();
+          // Transform API data to component format
+          const transformedSlides = data.map((slide: any) => ({
+            id: slide.id,
+            title: slide.title,
+            description: slide.description || '',
+            buttonText: slide.button_text,
+            buttonLink: slide.button_link,
+            backgroundImage: `${API_BASE}${slide.background_image}`,
+            textColor: slide.text_color || 'white'
+          }));
+
+          // Preload first slide image to prevent layout shift
+          if (transformedSlides.length > 0) {
+            const img = new Image();
+            img.onload = () => {
+              setSlides(transformedSlides);
+              setLoading(false);
+            };
+            img.onerror = () => {
+              // Even if image fails, show slides
+              setSlides(transformedSlides);
+              setLoading(false);
+            };
+            img.src = transformedSlides[0].backgroundImage;
+          } else {
+            setSlides(transformedSlides);
+            setLoading(false);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching hero slides:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchSlides();
+  }, []);
+
   // Auto-play functionality
   useEffect(() => {
-    if (!isAutoPlaying) return;
+    if (!isAutoPlaying || slides.length === 0) return;
 
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [isAutoPlaying]);
+  }, [isAutoPlaying, slides.length]);
 
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
@@ -166,6 +183,22 @@ const HeroSlider: React.FC = () => {
     setIsAutoPlaying(true);
   };
 
+  // If no slides and still loading, show loading state with skeleton
+  if (loading || slides.length === 0) {
+    return (
+      <section className="relative h-[70vh] md:h-[80vh] overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+        <div className="absolute inset-0 flex items-center justify-center">
+          {loading && (
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+              <p className="text-gray-500 text-sm">A carregar slides...</p>
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       className="relative h-[70vh] md:h-[80vh] overflow-hidden"
@@ -195,16 +228,32 @@ const HeroSlider: React.FC = () => {
             transition: isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
-          {slides.map((slide, index) => (
+          {slides.map((slide, index) => {
+            const isImageLoaded = imagesLoaded.has(index);
+            return (
             <div
               key={slide.id}
               className="w-full h-full flex-shrink-0 relative"
             >
               {/* Background Image */}
-              <div
-                className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-                style={{ backgroundImage: `url(${slide.backgroundImage})` }}
-              >
+              <div className="absolute inset-0 bg-gray-200">
+                {/* Skeleton loader while image loads */}
+                {!isImageLoaded && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 animate-pulse"></div>
+                )}
+
+                <img
+                  src={slide.backgroundImage}
+                  alt={slide.title}
+                  className={`w-full h-full object-cover transition-opacity duration-500 ${
+                    isImageLoaded ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  onLoad={() => {
+                    setImagesLoaded(prev => new Set(prev).add(index));
+                  }}
+                  loading="eager"
+                  fetchpriority={index === 0 ? 'high' : 'auto'}
+                />
                 {/* Overlay */}
                 <div className="absolute inset-0 bg-black bg-opacity-40"></div>
               </div>
@@ -241,7 +290,8 @@ const HeroSlider: React.FC = () => {
               </div>
             </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       </div>
 

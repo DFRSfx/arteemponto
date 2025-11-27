@@ -4,14 +4,15 @@ import { ArrowRight, Star, Heart, Shield, Grid2x2, Maximize2 } from 'lucide-reac
 import SEO from '../components/SEO';
 import HeroSlider from '../components/HeroSlider';
 import ProductCard from '../components/ProductCard';
-import { mockProducts } from '../data/products';
+import { useProducts } from '../hooks/useProducts';
 import { getOrganizationSchema, getWebSiteSchema } from '../utils/schemas';
 
 const Home: React.FC = () => {
+  const { products, loading, error } = useProducts();
   const [featuredViewMode, setFeaturedViewMode] = useState<'grid' | 'fullscreen'>('grid');
   const [newViewMode, setNewViewMode] = useState<'grid' | 'fullscreen'>('grid');
-  const featuredProducts = mockProducts.filter(product => product.featured).slice(0, 4);
-  const newProducts = mockProducts.filter(product => product.new).slice(0, 3);
+  const featuredProducts = products.filter(product => product.featured).slice(0, 4);
+  const newProducts = products.filter(product => product.new).slice(0, 4);
 
   // Combine Organization and WebSite schemas
   const schemas = {
@@ -43,6 +44,25 @@ const Home: React.FC = () => {
             </p>
           </div>
 
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">A carregar produtos...</p>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <p className="text-red-600 mb-4">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-6 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+              >
+                Tentar Novamente
+              </button>
+            </div>
+          ) : (
+            <>
           {/* View Mode Toggle - Mobile Only */}
           <div className="flex justify-center mb-6 sm:hidden">
             <div className="flex border border-gray-300 rounded-md overflow-hidden">
@@ -86,10 +106,13 @@ const Home: React.FC = () => {
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </div>
+          </>
+          )}
         </div>
       </section>
 
-      {/* New Products */}
+      {/* New Products - Only show if there are new products */}
+      {!loading && !error && newProducts.length > 0 && (
       <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
@@ -101,6 +124,8 @@ const Home: React.FC = () => {
             </p>
           </div>
 
+          {(
+            <>
           {/* View Mode Toggle - Mobile Only */}
           <div className="flex justify-center mb-6 sm:hidden">
             <div className="flex border border-gray-300 rounded-md overflow-hidden">
@@ -128,47 +153,116 @@ const Home: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {newProducts.map((product) => (
                 <ProductCard key={product.id} product={product} viewMode={newViewMode} />
               ))}
             </div>
           )}
+          </>
+          )}
         </div>
       </section>
+      )}
 
       {/* Features */}
-      <section className="py-16">
+      <section className="py-12 sm:py-16 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-primary-100 rounded-full flex items-center justify-center">
-                <Heart className="h-8 w-8 text-primary-600" />
+          {/* Mobile: 2 columns then 1 full width */}
+          <div className="md:hidden grid grid-cols-2 gap-4">
+            {/* Feature 1 */}
+            <div className="bg-white rounded-2xl p-5 shadow-sm">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-12 h-12 mb-3 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Heart className="h-6 w-6 text-white" />
+                </div>
+                <h3 className="text-base font-bold text-gray-900 mb-1.5">
+                  Feito à Mão
+                </h3>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Cada peça criada com amor e dedicação
+                </p>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Feito à Mão</h3>
-              <p className="text-gray-600">
-                Cada peça é cuidadosamente criada à mão com amor e dedicação
-              </p>
             </div>
 
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-primary-100 rounded-full flex items-center justify-center">
-                <Shield className="h-8 w-8 text-primary-600" />
+            {/* Feature 2 */}
+            <div className="bg-white rounded-2xl p-5 shadow-sm">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-12 h-12 mb-3 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Shield className="h-6 w-6 text-white" />
+                </div>
+                <h3 className="text-base font-bold text-gray-900 mb-1.5">
+                  Qualidade Premium
+                </h3>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Materiais de alta qualidade
+                </p>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Qualidade Premium</h3>
-              <p className="text-gray-600">
-                Utilizamos apenas materiais de alta qualidade e técnicas tradicionais
-              </p>
             </div>
 
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-primary-100 rounded-full flex items-center justify-center">
-                <Star className="h-8 w-8 text-primary-600" />
+            {/* Feature 3 - Full width */}
+            <div className="col-span-2 bg-white rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center gap-4 max-w-sm mx-auto">
+                <div className="w-12 h-12 flex-shrink-0 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Star className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-base font-bold text-gray-900 mb-1">
+                    Peças Únicas
+                  </h3>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    Designs exclusivos que não encontra em mais lugar nenhum
+                  </p>
+                </div>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Peças Únicas</h3>
-              <p className="text-gray-600">
-                Designs exclusivos que não encontra em mais lugar nenhum
-              </p>
+            </div>
+          </div>
+
+          {/* Desktop: Grid */}
+          <div className="hidden md:grid md:grid-cols-3 gap-8">
+            {/* Feature 1 */}
+            <div className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 mb-4 bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform">
+                  <Heart className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  Feito à Mão
+                </h3>
+                <p className="text-base text-gray-600 leading-relaxed">
+                  Cada peça é cuidadosamente criada à mão com amor e dedicação
+                </p>
+              </div>
+            </div>
+
+            {/* Feature 2 */}
+            <div className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 mb-4 bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform">
+                  <Shield className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  Qualidade Premium
+                </h3>
+                <p className="text-base text-gray-600 leading-relaxed">
+                  Utilizamos apenas materiais de alta qualidade e técnicas tradicionais
+                </p>
+              </div>
+            </div>
+
+            {/* Feature 3 */}
+            <div className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 mb-4 bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform">
+                  <Star className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  Peças Únicas
+                </h3>
+                <p className="text-base text-gray-600 leading-relaxed">
+                  Designs exclusivos que não encontra em mais lugar nenhum
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -185,10 +279,10 @@ const Home: React.FC = () => {
           </p>
           <Link
             to="/loja"
-            className="inline-flex items-center px-8 py-4 bg-white text-primary-600 font-semibold rounded-md hover:bg-gray-100 transition-colors"
+            className="inline-flex items-center px-8 py-4 bg-white text-primary-600 font-semibold rounded-md hover:bg-gray-100 hover:shadow-lg hover:scale-105 transition-all duration-300 group"
           >
             Explorar Loja
-            <ArrowRight className="ml-2 h-5 w-5" />
+            <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
           </Link>
         </div>
       </section>

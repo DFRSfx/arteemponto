@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { statsApi } from '../../utils/apiHelpers';
-import { DollarSign, ShoppingCart, Package, AlertTriangle } from 'lucide-react';
+import { DollarSign, ShoppingCart, Package, AlertTriangle, Users } from 'lucide-react';
+import { getAbsoluteImageUrl } from '../../utils/imageUtils';
 
 interface Stats {
   totalOrders: number;
   totalRevenue: string;
   totalProducts: number;
   pendingOrders: number;
+  totalUsers: number;
   recentOrders: any[];
   lowStockProducts: any[];
   salesByCategory: Record<string, { total: number; quantity: number }>;
@@ -32,6 +34,17 @@ export default function Dashboard() {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    const statusMap: Record<string, string> = {
+      pending: 'Pendente',
+      processing: 'A Processar',
+      shipped: 'Enviado',
+      delivered: 'Entregue',
+      cancelled: 'Cancelado'
+    };
+    return statusMap[status] || status;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -49,8 +62,8 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Receita Total</p>
@@ -64,10 +77,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
+        <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Encomendas Totais</p>
+              <p className="text-sm text-gray-600">Encomendas</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
                 {stats?.totalOrders || 0}
               </p>
@@ -78,10 +91,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
+        <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Produtos Totais</p>
+              <p className="text-sm text-gray-600">Produtos</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
                 {stats?.totalProducts || 0}
               </p>
@@ -92,16 +105,30 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
+        <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Encomendas Pendentes</p>
+              <p className="text-sm text-gray-600">Pendentes</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
                 {stats?.pendingOrders || 0}
               </p>
             </div>
             <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
               <AlertTriangle className="text-orange-600" size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Utilizadores</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {stats?.totalUsers || 0}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <Users className="text-indigo-600" size={24} />
             </div>
           </div>
         </div>
@@ -120,7 +147,7 @@ export default function Dashboard() {
                 {stats.recentOrders.map((order) => (
                   <Link
                     key={order.id}
-                    to={`/admin/orders/${order.id}`}
+                    to={`/admin/encomendas/${order.id}`}
                     className="block p-4 border border-gray-200 rounded-lg hover:border-amber-300 hover:bg-amber-50 transition-colors"
                   >
                     <div className="flex items-center justify-between">
@@ -137,7 +164,7 @@ export default function Dashboard() {
                           order.status === 'delivered' ? 'bg-green-100 text-green-800' :
                           'bg-red-100 text-red-800'
                         }`}>
-                          {order.status}
+                          {getStatusLabel(order.status)}
                         </span>
                       </div>
                     </div>
@@ -161,12 +188,12 @@ export default function Dashboard() {
                 {stats.lowStockProducts.map((product) => (
                   <Link
                     key={product.id}
-                    to={`/admin/products/edit/${product.id}`}
+                    to={`/admin/produtos/editar/${product.id}`}
                     className="block p-4 border border-red-200 bg-red-50 rounded-lg hover:border-red-300 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <img
-                        src={product.image}
+                        src={product.images && product.images.length > 0 ? getAbsoluteImageUrl(product.images[0]) : '/placeholder.png'}
                         alt={product.name}
                         className="w-12 h-12 object-cover rounded"
                       />

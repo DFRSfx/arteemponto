@@ -140,7 +140,7 @@ class UserModel {
     return rows[0].total;
   }
 
-  static async getSafeUser(user: User): SafeUser {
+  static async getSafeUser(user: User): Promise<SafeUser> {
     const { password, ...safeUser } = user;
     return safeUser;
   }

@@ -13,9 +13,9 @@ router.get('/dashboard', ...requireAdmin, async (req: AuthRequest, res) => {
     );
     const totalOrders = orderCount[0].total;
 
-    // Get total revenue
+    // Get total revenue (only from paid/completed orders)
     const [revenueResult]: any = await pool.query(
-      'SELECT SUM(total) as revenue FROM orders'
+      "SELECT SUM(total) as revenue FROM orders WHERE status IN ('processing', 'shipped', 'delivered')"
     );
     const totalRevenue = revenueResult[0].revenue || 0;
 
@@ -25,11 +25,17 @@ router.get('/dashboard', ...requireAdmin, async (req: AuthRequest, res) => {
     );
     const totalProducts = productCount[0].total;
 
-    // Get pending orders
+    // Get pending orders count
     const [pendingCount]: any = await pool.query(
       "SELECT COUNT(*) as total FROM orders WHERE status = 'pending'"
     );
     const pendingOrders = pendingCount[0].total;
+
+    // Get total users count
+    const [userCount]: any = await pool.query(
+      'SELECT COUNT(*) as total FROM users WHERE role != "admin"'
+    );
+    const totalUsers = userCount[0].total;
 
     // Get recent orders
     const [recentOrders] = await pool.query(`
@@ -38,23 +44,39 @@ router.get('/dashboard', ...requireAdmin, async (req: AuthRequest, res) => {
       LIMIT 5
     `);
 
-    // Get low stock products
-    const [lowStockProducts] = await pool.query(`
-      SELECT * FROM products
-      WHERE stock <= 10
-      ORDER BY stock ASC
+    // Get low stock products with images and category names
+    const [lowStockProducts]: any = await pool.query(`
+      SELECT
+        p.*,
+        c.name as category,
+        GROUP_CONCAT(pi.id ORDER BY pi.display_order) as image_ids
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN product_images pi ON p.id = pi.product_id
+      WHERE p.stock <= 10
+      GROUP BY p.id
+      ORDER BY p.stock ASC
       LIMIT 5
     `);
+
+    // Convert image_ids to array of image URLs for low stock products
+    const lowStockProductsWithImages = lowStockProducts.map((product: any) => ({
+      ...product,
+      images: product.image_ids ?
+        product.image_ids.split(',').map((id: string) => `/products/image/${id}?v=${Date.now()}`) :
+        []
+    }));
 
     // Get sales by category
     const [categorySales]: any = await pool.query(`
       SELECT
-        p.category,
+        c.name as category,
         SUM(oi.quantity) as quantity,
         SUM(oi.price * oi.quantity) as total
       FROM order_items oi
       JOIN products p ON oi.product_id = p.id
-      GROUP BY p.category
+      JOIN categories c ON p.category_id = c.id
+      GROUP BY c.name
       ORDER BY total DESC
     `);
 
@@ -68,11 +90,12 @@ router.get('/dashboard', ...requireAdmin, async (req: AuthRequest, res) => {
 
     res.json({
       totalOrders,
-      totalRevenue: totalRevenue.toFixed(2),
+      totalRevenue: Number(totalRevenue).toFixed(2),
       totalProducts,
       pendingOrders,
+      totalUsers,
       recentOrders,
-      lowStockProducts,
+      lowStockProducts: lowStockProductsWithImages,
       salesByCategory
     });
   } catch (error) {

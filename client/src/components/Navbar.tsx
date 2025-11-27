@@ -2,14 +2,70 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Search, ShoppingCart, Heart, User, LogOut, Package, UserCircle, Settings } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useFavorites } from '../context/FavoritesContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { mockProducts } from '../data/products';
+import { useProducts } from '../hooks/useProducts';
+import { useCategories } from '../hooks/useCategories';
 import { Product } from '../types';
 import AuthModal from './AuthModal';
-import { categories } from '../data/categories';
+import { getAbsoluteImageUrl } from '../utils/imageUtils';
 
 const Navbar: React.FC = () => {
+  const { products, loading: productsLoading } = useProducts();
+  const { categories, loading: categoriesLoading } = useCategories();
+  const { user, isAuthenticated, logout, refreshUser } = useAuth();
+  const { items, total, addItem, removeItem, updateQuantity, clearCart, itemCount } = useCart();
+  const { favorites } = useFavorites();
+  const { success, info } = useToast();
+
+  // Function to get random product image from category
+  const getCategoryImage = (categoryName: string): string | null => {
+    const categoryProducts = products.filter(p => p.category === categoryName);
+    if (categoryProducts.length === 0) return null;
+
+    const randomProduct = categoryProducts[Math.floor(Math.random() * categoryProducts.length)];
+    return randomProduct.images[0] ? getAbsoluteImageUrl(randomProduct.images[0]) : null;
+  };
+
+  // SVG Placeholder for categories without products
+  const CategoryPlaceholder = () => (
+    <svg viewBox="0 0 200 200" className="w-full h-full">
+      <defs>
+        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style={{ stopColor: '#e0e7ff', stopOpacity: 1 }} />
+          <stop offset="100%" style={{ stopColor: '#c7d2fe', stopOpacity: 1 }} />
+        </linearGradient>
+      </defs>
+      <rect width="200" height="200" fill="url(#grad1)" />
+      <g transform="translate(100, 100)">
+        <path
+          d="M-30,-30 L30,-30 L30,30 L-30,30 Z"
+          fill="none"
+          stroke="#6366f1"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="0" cy="-15" r="8" fill="#6366f1" opacity="0.6" />
+        <path
+          d="M-20,0 Q0,-10 20,0 T-20,20"
+          fill="none"
+          stroke="#6366f1"
+          strokeWidth="2.5"
+          opacity="0.6"
+        />
+      </g>
+    </svg>
+  );
+
+  // Refresh user data on mount to get latest role
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshUser();
+    }
+  }, [isAuthenticated]);
+
   const [isOpen, setIsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -19,7 +75,6 @@ const Navbar: React.FC = () => {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [megaMenuOpen, setMegaMenuOpen] = useState(false);
-  const { itemCount } = useCart();
   const location = useLocation();
   const navigate = useNavigate();
   const searchRef = useRef<HTMLDivElement>(null);
@@ -32,11 +87,9 @@ const Navbar: React.FC = () => {
   const [scrollLeft, setScrollLeft] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [hasMoved, setHasMoved] = useState(false);
-  const { user, isAuthenticated, logout } = useAuth();
-  const { info } = useToast();
 
   const navigation = [
-    { name: 'Home', href: '/' },
+    { name: 'Início', href: '/' },
     { name: 'Loja', href: '/loja' },
     // { name: 'Sobre', href: '/sobre' },
     { name: 'Contacto', href: '/contacto' },
@@ -48,10 +101,29 @@ const Navbar: React.FC = () => {
     return false;
   };
 
+  // Sync selectedCategory with URL
+  useEffect(() => {
+    const pathParts = location.pathname.split('/');
+    if (pathParts[1] === 'loja' && pathParts[2]) {
+      // URL is /loja/category-slug - find category by slug
+      const slug = pathParts[2];
+      const category = categories.find(cat => {
+        const catSlug = cat.name.toLowerCase().replace(/\s+/g, '-');
+        return catSlug === slug;
+      });
+      if (category) {
+        setSelectedCategory(category.name);
+      }
+    } else if (pathParts[1] === 'loja') {
+      // URL is just /loja - no category selected
+      setSelectedCategory('');
+    }
+  }, [location.pathname, categories]);
+
   // Search functionality
   useEffect(() => {
-    if (searchQuery.trim().length > 0) {
-      const results = mockProducts.filter(product =>
+    if (searchQuery.trim().length > 0 && products.length > 0) {
+      const results = products.filter(product =>
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -61,7 +133,7 @@ const Navbar: React.FC = () => {
     } else {
       setSearchResults([]);
     }
-  }, [searchQuery]);
+  }, [searchQuery, products]);
 
   // Close search and menus on click outside
   useEffect(() => {
@@ -164,11 +236,15 @@ const Navbar: React.FC = () => {
   const handleCategoryClick = (categoryName: string) => {
     if (hasMoved) return; // Não navegar se foi um drag
 
-    setSelectedCategory(selectedCategory === categoryName ? '' : categoryName);
-    if (selectedCategory === categoryName) {
+    const wasSelected = selectedCategory === categoryName;
+    setSelectedCategory(wasSelected ? '' : categoryName);
+
+    if (wasSelected) {
       navigate('/loja');
     } else {
-      navigate(`/loja?categoria=${encodeURIComponent(categoryName)}`);
+      // Create slug from category name
+      const slug = categoryName.toLowerCase().replace(/\s+/g, '-');
+      navigate(`/loja/${slug}`);
     }
   };
 
@@ -222,48 +298,82 @@ const Navbar: React.FC = () => {
                       >
                         <div className="p-8">
                           <h3 className="text-xl font-semibold text-gray-900 mb-6">Explorar Categorias</h3>
-                          <div className="grid grid-cols-3 gap-6">
-                            {/* Todas as Categorias */}
-                            <Link
-                              to="/loja"
-                              onClick={() => setMegaMenuOpen(false)}
-                              className="group relative overflow-hidden rounded-lg hover:shadow-xl transition-all duration-300"
-                            >
-                              <div className="aspect-square bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
-                                <span className="text-4xl font-bold text-primary-600">Todas</span>
-                              </div>
-                              <div className="p-4 bg-white">
-                                <h4 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
-                                  Todas as Categorias
-                                </h4>
-                                <p className="text-sm text-gray-600 mt-1">Ver todos os produtos</p>
-                              </div>
-                            </Link>
-
-                            {/* Categorias com Imagens */}
-                            {categories.map((category) => (
+                          {categoriesLoading ? (
+                            <div className="grid grid-cols-3 gap-6">
+                              {[1, 2, 3, 4, 5, 6].map((i) => (
+                                <div key={i} className="animate-pulse">
+                                  <div className="aspect-square bg-gray-200 rounded-lg mb-4"></div>
+                                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-3 gap-6">
+                              {/* Todas as Categorias */}
                               <Link
-                                key={category.name}
-                                to={`/loja?categoria=${encodeURIComponent(category.name)}`}
+                                to="/loja"
                                 onClick={() => setMegaMenuOpen(false)}
                                 className="group relative overflow-hidden rounded-lg hover:shadow-xl transition-all duration-300"
                               >
-                                <div className="aspect-square overflow-hidden">
-                                  <img
-                                    src={category.image}
-                                    alt={category.name}
-                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                                  />
+                                <div className="aspect-square bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
+                                  <span className="text-4xl font-bold text-primary-600">Todas</span>
                                 </div>
                                 <div className="p-4 bg-white">
                                   <h4 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
-                                    {category.name}
+                                    Todas as Categorias
                                   </h4>
-                                  <p className="text-sm text-gray-600 mt-1">{category.description}</p>
+                                  <p className="text-sm text-gray-600 mt-1">Ver todos os produtos</p>
                                 </div>
                               </Link>
-                            ))}
-                          </div>
+
+                              {/* Categorias com Imagens Dinâmicas */}
+                              {categories.length > 0 ? (
+                                categories.map((category) => {
+                                  const slug = category.slug || category.name.toLowerCase().replace(/\s+/g, '-');
+                                  const categoryImage = getCategoryImage(category.name);
+
+                                  return (
+                                    <Link
+                                      key={category.id}
+                                      to={`/loja/${slug}`}
+                                      onClick={() => setMegaMenuOpen(false)}
+                                      className="group relative overflow-hidden rounded-lg hover:shadow-xl transition-all duration-300 border border-gray-100"
+                                    >
+                                      <div className="aspect-square overflow-hidden bg-gray-50">
+                                        {categoryImage ? (
+                                          <img
+                                            src={categoryImage}
+                                            alt={category.name}
+                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                            onError={(e) => {
+                                              e.currentTarget.style.display = 'none';
+                                              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                            }}
+                                          />
+                                        ) : null}
+                                        <div className={categoryImage ? 'hidden' : ''}>
+                                          <CategoryPlaceholder />
+                                        </div>
+                                      </div>
+                                      <div className="p-4 bg-white">
+                                        <h4 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+                                          {category.name}
+                                        </h4>
+                                        <p className="text-sm text-gray-600 mt-1">
+                                          {category.description || 'Explorar produtos'}
+                                        </p>
+                                      </div>
+                                    </Link>
+                                  );
+                                })
+                              ) : (
+                                <div className="col-span-2 text-center py-8">
+                                  <p className="text-gray-500">Nenhuma categoria disponível</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -314,7 +424,7 @@ const Navbar: React.FC = () => {
                         className="w-full px-4 py-3 hover:bg-gray-50 flex items-center gap-3 text-left transition-colors"
                       >
                         <img
-                          src={product.images[0]}
+                          src={getAbsoluteImageUrl(product.images[0])}
                           alt={product.name}
                           className="w-12 h-12 object-cover rounded"
                         />
@@ -348,9 +458,14 @@ const Navbar: React.FC = () => {
             {/* Heart - Desktop only */}
             <Link 
               to="/favoritos"
-              className="hidden md:block p-2 text-gray-600 hover:text-primary-600 transition-colors"
+              className="hidden md:block p-2 text-gray-600 hover:text-primary-600 transition-colors relative"
             >
               <Heart className="h-6 w-6" />
+              {favorites.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-primary-600 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center">
+                  {favorites.length}
+                </span>
+              )}
             </Link>
 
             <Link
@@ -414,7 +529,7 @@ const Navbar: React.FC = () => {
                           className="w-full px-4 py-3 hover:bg-gray-50 flex items-center gap-3 text-left transition-colors"
                         >
                           <img
-                            src={product.images[0]}
+                            src={getAbsoluteImageUrl(product.images[0])}
                             alt={product.name}
                             className="w-12 h-12 object-cover rounded"
                           />
@@ -460,6 +575,43 @@ const Navbar: React.FC = () => {
               {/* Divider */}
               <div className="border-t border-gray-200 my-2"></div>
 
+              {/* Favorites - Mobile */}
+              <Link
+                to="/favoritos"
+                onClick={() => setIsOpen(false)}
+                className="w-full flex items-center justify-between px-3 py-2 text-base font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Heart className="h-5 w-5" />
+                  Favoritos
+                </div>
+                {favorites.length > 0 && (
+                  <span className="bg-primary-600 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center">
+                    {favorites.length}
+                  </span>
+                )}
+              </Link>
+
+              {/* Cart - Mobile */}
+              <Link
+                to="/carrinho"
+                onClick={() => setIsOpen(false)}
+                className="w-full flex items-center justify-between px-3 py-2 text-base font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <ShoppingCart className="h-5 w-5" />
+                  Carrinho
+                </div>
+                {itemCount > 0 && (
+                  <span className="bg-primary-600 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center">
+                    {itemCount}
+                  </span>
+                )}
+              </Link>
+
+              {/* Divider */}
+              <div className="border-t border-gray-200 my-2"></div>
+
               {/* User Account - Mobile */}
               <button
                 onClick={() => {
@@ -491,20 +643,31 @@ const Navbar: React.FC = () => {
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex gap-8 py-4 justify-start md:justify-center min-w-max">
-              {/* Categorias */}
-              {categories.map((category) => (
-                <button
-                  key={category.name}
-                  onClick={() => handleCategoryClick(category.name)}
-                  className={`flex-shrink-0 pb-2 border-b-2 transition-all duration-300 whitespace-nowrap text-base font-medium ${
-                    selectedCategory === category.name
-                      ? 'border-primary-600 text-primary-600'
-                      : 'border-transparent text-gray-600 hover:text-primary-600 hover:border-gray-300'
-                  }`}
-                >
-                  {category.name}
-                </button>
-              ))}
+              {/* Loading state */}
+              {categoriesLoading ? (
+                <div className="flex gap-8">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-6 w-24 bg-gray-200 animate-pulse rounded"></div>
+                  ))}
+                </div>
+              ) : categories.length > 0 ? (
+                /* Categorias */
+                categories.map((category) => (
+                  <button
+                    key={category.name}
+                    onClick={() => handleCategoryClick(category.name)}
+                    className={`flex-shrink-0 pb-2 border-b-2 transition-all duration-300 whitespace-nowrap text-base font-medium ${
+                      selectedCategory === category.name
+                        ? 'border-primary-600 text-primary-600'
+                        : 'border-transparent text-gray-600 hover:text-primary-600 hover:border-gray-300'
+                    }`}
+                  >
+                    {category.name}
+                  </button>
+                ))
+              ) : (
+                <p className="text-gray-500 text-sm">Nenhuma categoria disponível</p>
+              )}
             </div>
           </div>
         </div>
@@ -575,15 +738,6 @@ const Navbar: React.FC = () => {
                     Benefícios de Cliente
                   </h3>
                   <div className="space-y-3">
-                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg">
-                      <div className="p-2 bg-primary-100 rounded-lg">
-                        <ShoppingCart className="h-5 w-5 text-primary-600" />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-900 text-sm">Envio Grátis</h4>
-                        <p className="text-xs text-gray-600 mt-1">Em compras acima de 30€</p>
-                      </div>
-                    </div>
                     <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg">
                       <div className="p-2 bg-primary-100 rounded-lg">
                         <Package className="h-5 w-5 text-primary-600" />
@@ -680,14 +834,21 @@ const Navbar: React.FC = () => {
                       onClick={handleCloseUserMenu}
                       className="group flex items-center gap-4 p-4 rounded-xl hover:bg-primary-50 transition-all border border-transparent hover:border-primary-200"
                     >
-                      <div className="p-2 bg-primary-100 rounded-lg group-hover:bg-primary-200 transition-colors">
+                      <div className="p-2 bg-primary-100 rounded-lg group-hover:bg-primary-200 transition-colors relative">
                         <Heart className="h-5 w-5 text-primary-600" />
+                        {favorites.length > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-primary-600 text-white rounded-full text-xs w-4 h-4 flex items-center justify-center">
+                            {favorites.length}
+                          </span>
+                        )}
                       </div>
                       <div className="flex-1">
                         <h4 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
                           Favoritos
                         </h4>
-                        <p className="text-xs text-gray-500">Produtos guardados</p>
+                        <p className="text-xs text-gray-500">
+                          {favorites.length === 0 ? 'Produtos guardados' : `${favorites.length} ${favorites.length === 1 ? 'produto' : 'produtos'}`}
+                        </p>
                       </div>
                       <svg className="h-5 w-5 text-gray-400 group-hover:text-primary-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

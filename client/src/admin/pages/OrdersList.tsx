@@ -163,8 +163,9 @@ export default function OrdersList() {
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end">
                       <Link
-                        to={`/admin/orders/${order.id}`}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        to={`/admin/encomendas/${order.id}`}
+                        className="p-3 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        aria-label="Ver detalhes da encomenda"
                       >
                         <Eye size={18} />
                       </Link>

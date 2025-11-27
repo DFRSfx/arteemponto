@@ -7,12 +7,14 @@ export interface Product {
   category: string;
   colors: string[];
   inStock: boolean;
+  stock?: number; // Stock quantity (for Favorites page)
   featured: boolean;
   new: boolean;
   tags: string[];
 }
 
 export interface CartItem {
+  cartItemId?: number; // ID from cart_items table (for deletions/updates)
   product: Product;
   quantity: number;
   selectedColor?: string;

@@ -1,92 +1,84 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Package, Truck, CheckCircle, XCircle, Clock, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { getAbsoluteImageUrl } from '../utils/imageUtils';
+import SEO from '../components/SEO';
 
 interface OrderItem {
   id: number;
-  productName: string;
-  productImage: string;
   quantity: number;
   price: number;
+  product: {
+    id: number;
+    name: string;
+    image: string;
+  };
 }
 
 interface Order {
   id: number;
-  date: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  tracking_token: string;
   total: number;
-  items: OrderItem[];
-  shippingAddress: string;
-  paymentMethod: string;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  payment_status: 'pending' | 'paid' | 'failed' | 'expired';
+  payment_method: string;
+  created_at: string;
+  customer_address: string;
+  customer_city: string;
+  customer_postal_code: string;
+  order_items: OrderItem[];
 }
 
 const Orders: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, token } = useAuth();
   const navigate = useNavigate();
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - substituir com dados reais da API
-  const [orders] = useState<Order[]>([
-    {
-      id: 1001,
-      date: '2025-01-15',
-      status: 'delivered',
-      total: 45.99,
-      items: [
-        {
-          id: 1,
-          productName: 'Toalha Bordada Premium',
-          productImage: '/images/products/toalha1.jpg',
-          quantity: 2,
-          price: 22.99,
-        },
-      ],
-      shippingAddress: 'Rua Example, 123, Lisboa',
-      paymentMethod: 'Cartão de Crédito',
-    },
-    {
-      id: 1002,
-      date: '2025-01-10',
-      status: 'shipped',
-      total: 78.50,
-      items: [
-        {
-          id: 2,
-          productName: 'Guardanapo Set 6un',
-          productImage: '/images/products/guardanapo1.jpg',
-          quantity: 1,
-          price: 34.99,
-        },
-        {
-          id: 3,
-          productName: 'Almofada Decorativa',
-          productImage: '/images/products/almofada1.jpg',
-          quantity: 1,
-          price: 43.51,
-        },
-      ],
-      shippingAddress: 'Av. da Liberdade, 456, Porto',
-      paymentMethod: 'MB WAY',
-    },
-    {
-      id: 1003,
-      date: '2025-01-05',
-      status: 'processing',
-      total: 29.99,
-      items: [
-        {
-          id: 4,
-          productName: 'Pano de Cozinha Artesanal',
-          productImage: '/images/products/pano1.jpg',
-          quantity: 3,
-          price: 9.99,
-        },
-      ],
-      shippingAddress: 'Rua Example, 123, Lisboa',
-      paymentMethod: 'Transferência Bancária',
-    },
-  ]);
+  const API_BASE_URL = '/api';
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadOrders();
+    }
+  }, [isAuthenticated]);
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      
+      if (!token) {
+        console.error('No auth token available');
+        setError('Sem token de autenticação');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/orders/my-orders`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao carregar encomendas');
+      }
+
+      const data = await response.json();
+      setOrders(data);
+    } catch (err: any) {
+      setError(err.message || 'Erro ao carregar encomendas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Remove mock data
+  /*const [orders] = useState<Order[]>([
+  */
 
   React.useEffect(() => {
     if (!isAuthenticated) {
@@ -130,6 +122,21 @@ const Orders: React.FC = () => {
     return configs[status];
   };
 
+  const getPaymentStatusBadge = (paymentStatus: string) => {
+    switch (paymentStatus) {
+      case 'paid':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Pago</span>;
+      case 'pending':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Pendente</span>;
+      case 'failed':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Falhado</span>;
+      case 'expired':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">Expirado</span>;
+      default:
+        return null;
+    }
+  };
+
   const toggleOrder = (orderId: number) => {
     setExpandedOrder(expandedOrder === orderId ? null : orderId);
   };
@@ -138,14 +145,37 @@ const Orders: React.FC = () => {
     return null;
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">A carregar encomendas...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-12">
+      <SEO
+        title="Minhas Encomendas"
+        description="Veja todas as suas encomendas e o seu estado"
+        canonical="/encomendas"
+        ogType="website"
+      />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">As Minhas Encomendas</h1>
           <p className="text-gray-600 mt-2">Acompanhe o estado das suas encomendas</p>
         </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+            {error}
+          </div>
+        )}
 
         {/* Orders List */}
         {orders.length === 0 ? (
@@ -186,20 +216,21 @@ const Orders: React.FC = () => {
                         <div>
                           <p className="text-sm text-gray-500">Data</p>
                           <p className="font-medium text-gray-900">
-                            {new Date(order.date).toLocaleDateString('pt-PT')}
+                            {new Date(order.created_at).toLocaleDateString('pt-PT')}
                           </p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-500">Total</p>
-                          <p className="font-semibold text-gray-900">{order.total.toFixed(2)}€</p>
+                          <p className="font-semibold text-gray-900">{parseFloat(order.total).toFixed(2)}€</p>
                         </div>
-                        <div>
+                        <div className="flex items-center gap-2">
                           <span
                             className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${statusConfig.bgColor} ${statusConfig.color}`}
                           >
                             <StatusIcon className="h-4 w-4" />
                             {statusConfig.label}
                           </span>
+                          {getPaymentStatusBadge(order.payment_status)}
                         </div>
                       </div>
                       <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -220,27 +251,32 @@ const Orders: React.FC = () => {
                         <div className="lg:col-span-2">
                           <h4 className="font-semibold text-gray-900 mb-4">Produtos</h4>
                           <div className="space-y-4">
-                            {order.items.map((item) => (
+                            {order.order_items.map((item) => (
                               <div
                                 key={item.id}
                                 className="flex items-center gap-4 bg-white p-4 rounded-lg"
                               >
                                 <img
-                                  src={item.productImage}
-                                  alt={item.productName}
+                                  src={item.product.image}
+                                  alt={item.product.name}
                                   className="w-20 h-20 object-cover rounded-lg"
                                   onError={(e) => {
                                     e.currentTarget.src = '/images/placeholder.jpg';
                                   }}
                                 />
                                 <div className="flex-1">
-                                  <h5 className="font-medium text-gray-900">{item.productName}</h5>
+                                  <Link
+                                    to={`/produto/${item.product.id}`}
+                                    className="font-medium text-gray-900 hover:text-primary-600"
+                                  >
+                                    {item.product.name}
+                                  </Link>
                                   <p className="text-sm text-gray-600 mt-1">
-                                    Quantidade: {item.quantity}
+                                    Quantidade: {item.quantity} × {item.price.toFixed(2)}€
                                   </p>
                                 </div>
                                 <p className="font-semibold text-gray-900">
-                                  {item.price.toFixed(2)}€
+                                  {(item.quantity * item.price).toFixed(2)}€
                                 </p>
                               </div>
                             ))}
@@ -253,25 +289,29 @@ const Orders: React.FC = () => {
                           <div className="space-y-4">
                             <div className="bg-white p-4 rounded-lg">
                               <p className="text-sm text-gray-500 mb-1">Morada de Envio</p>
-                              <p className="text-sm text-gray-900">{order.shippingAddress}</p>
+                              <p className="text-sm text-gray-900">{order.customer_address}</p>
+                              <p className="text-sm text-gray-900">{order.customer_postal_code} {order.customer_city}</p>
                             </div>
                             <div className="bg-white p-4 rounded-lg">
                               <p className="text-sm text-gray-500 mb-1">Método de Pagamento</p>
-                              <p className="text-sm text-gray-900">{order.paymentMethod}</p>
+                              <p className="text-sm text-gray-900 capitalize">{order.payment_method}</p>
                             </div>
                             <div className="bg-white p-4 rounded-lg">
                               <p className="text-sm text-gray-500 mb-1">Total</p>
                               <p className="text-lg font-bold text-primary-600">
-                                {order.total.toFixed(2)}€
+                                {parseFloat(order.total).toFixed(2)}€
                               </p>
                             </div>
                           </div>
 
                           {/* Actions */}
-                          <button className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
+                          <Link
+                            to={`/track-order/${order.tracking_token}`}
+                            className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                          >
                             <Eye className="h-4 w-4" />
                             Ver Detalhes
-                          </button>
+                          </Link>
                         </div>
                       </div>
                     </div>

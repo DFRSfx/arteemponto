@@ -7,8 +7,7 @@ export interface Product {
   description: string;
   price: number;
   category_id: number; // FK to categories table
-  image: string;
-  imagens?: string[]; // JSON array of additional images (base64 or URLs)
+  colors?: string[]; // JSON array of available colors
   stock: number;
   featured: boolean;
   created_at: Date;
@@ -25,8 +24,7 @@ export interface ProductInput {
   description: string;
   price: number;
   category_id: number; // FK to categories table
-  image: string;
-  imagens?: string[];
+  colors?: string[];
   stock: number;
   featured?: boolean;
 }
@@ -51,12 +49,12 @@ class ProductModel {
     if (rows.length === 0) return null;
 
     const product = rows[0] as any;
-    // Parse JSON field if it exists
-    if (product.imagens && typeof product.imagens === 'string') {
+    // Parse JSON fields if they exist
+    if (product.colors && typeof product.colors === 'string') {
       try {
-        product.imagens = JSON.parse(product.imagens);
+        product.colors = JSON.parse(product.colors);
       } catch (e) {
-        product.imagens = [];
+        product.colors = [];
       }
     }
 
@@ -119,11 +117,11 @@ class ProductModel {
     // Parse JSON fields
     return rows.map(row => {
       const product = row as any;
-      if (product.imagens && typeof product.imagens === 'string') {
+      if (product.colors && typeof product.colors === 'string') {
         try {
-          product.imagens = JSON.parse(product.imagens);
+          product.colors = JSON.parse(product.colors);
         } catch (e) {
-          product.imagens = [];
+          product.colors = [];
         }
       }
       return product as ProductWithCategory;
@@ -143,23 +141,23 @@ class ProductModel {
   }
 
   static async create(productData: ProductInput): Promise<number> {
-    const { name, description, price, category_id, image, imagens, stock, featured } = productData;
+    const { name, description, price, category_id, colors, stock, featured } = productData;
 
-    // Convert imagens array to JSON string
-    const imagensJson = imagens ? JSON.stringify(imagens) : null;
+    // Convert colors array to JSON string
+    const colorsJson = colors ? JSON.stringify(colors) : null;
 
     const [result] = await pool.execute<ResultSetHeader>(
-      'INSERT INTO products (name, description, price, category_id, image, imagens, stock, featured) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, description, price, category_id, image, imagensJson, stock, featured || false]
+      'INSERT INTO products (name, description, price, category_id, colors, stock, featured) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [name, description, price, category_id, colorsJson, stock, featured || false]
     );
     return result.insertId;
   }
 
   static async update(id: number, productData: Partial<ProductInput>): Promise<void> {
-    const { name, description, price, category_id, image, imagens, stock, featured } = productData;
+    const { name, description, price, category_id, colors, stock, featured } = productData;
 
-    // Convert imagens array to JSON string if provided
-    const imagensJson = imagens !== undefined ? JSON.stringify(imagens) : undefined;
+    // Convert colors array to JSON string if provided
+    const colorsJson = colors !== undefined ? JSON.stringify(colors) : undefined;
 
     const updates: string[] = [];
     const params: any[] = [];
@@ -180,13 +178,9 @@ class ProductModel {
       updates.push('category_id = ?');
       params.push(category_id);
     }
-    if (image !== undefined) {
-      updates.push('image = ?');
-      params.push(image);
-    }
-    if (imagensJson !== undefined) {
-      updates.push('imagens = ?');
-      params.push(imagensJson);
+    if (colorsJson !== undefined) {
+      updates.push('colors = ?');
+      params.push(colorsJson);
     }
     if (stock !== undefined) {
       updates.push('stock = ?');

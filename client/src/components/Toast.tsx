@@ -109,7 +109,7 @@ const Toast: React.FC<ToastProps> = ({
   // Desktop toast style
   return (
     <div
-      className={`fixed top-4 right-4 md:top-6 md:right-6 z-[100] max-w-sm w-full ${isClosing ? 'animate-slideOutRight' : 'animate-slideInRight'}`}
+      className={`fixed top-20 right-4 md:top-24 md:right-6 z-[100] max-w-sm w-full ${isClosing ? 'animate-slideOutRight' : 'animate-slideInRight'}`}
     >
       <div
         className={`${bgColor} ${borderColor} border-l-4 rounded-lg shadow-xl p-4 flex items-start gap-3`}

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, MapPin, Save, Edit2, Lock } from 'lucide-react';
 import FloatingLabelInput from '../components/FloatingLabelInput';
 
 const Profile: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isEmailVerified } = useAuth();
+  const { error } = useToast();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
@@ -56,7 +58,7 @@ const Profile: React.FC = () => {
     e.preventDefault();
     
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert('As passwords não coincidem');
+      error('As passwords não coincidem');
       return;
     }
 

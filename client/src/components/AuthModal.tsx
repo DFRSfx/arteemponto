@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Mail, CheckCircle, ArrowLeft } from 'lucide-react';
+import { useGoogleLogin } from '@react-oauth/google';
 import FloatingLabelInput from './FloatingLabelInput';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -11,18 +12,24 @@ interface AuthModalProps {
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'login' }) => {
-  const { isAuthenticated, login, register, user } = useAuth();
+  const { isAuthenticated, login, register } = useAuth();
   const { success, error: showError } = useToast();
-  const [mode, setMode] = useState<'login' | 'register'>(initialMode);
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(initialMode);
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [registerData, setRegisterData] = useState({ name: '', email: '', password: '' });
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [newsletter, setNewsletter] = useState(false);
   const [privacyPolicy, setPrivacyPolicy] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [showVerificationNotice, setShowVerificationNotice] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [isProcessingGoogleCode, setIsProcessingGoogleCode] = useState(false);
+
   // Swipe to close states
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -43,15 +50,102 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
   const validChecksCount = Object.values(passwordChecks).filter(Boolean).length;
   const isPasswordValid = validChecksCount >= 4;
 
+  const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
+
   React.useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setForgotSuccess(false);
+      setForgotEmail('');
+      setError(null);
+    }
+  }, [isOpen]);
+
+  // Handle Google OAuth redirect callback
+  React.useEffect(() => {
+    const processGoogleCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+
+      if (code && !isAuthenticated && !isProcessingGoogleCode) {
+        // Check if we've already processed this code
+        const processedCode = sessionStorage.getItem('google_oauth_processed_code');
+        if (processedCode === code) {
+          console.log('🔐 Code already processed, skipping...');
+          // Clean the URL without processing again
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        }
+
+        // Mark this code as being processed
+        sessionStorage.setItem('google_oauth_processed_code', code);
+        setIsProcessingGoogleCode(true);
+
+        try {
+          setIsLoading(true);
+
+          // Send the authorization code to the backend
+          const response = await fetch(`${API_BASE_URL}/auth/google/callback`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              code,
+              redirect_uri: window.location.origin
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Erro ao fazer login com Google');
+          }
+
+          const data = await response.json();
+
+          // Store token and user data in localStorage
+          localStorage.setItem('auth_token', data.token);
+          localStorage.setItem('auth_user', JSON.stringify(data.user));
+
+          // Clean the URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+
+          success('Bem-vindo! Login efetuado com sucesso 🎉');
+
+          // Reload to update auth context
+          window.location.reload();
+        } catch (err: any) {
+          // Clear the processed code on error so user can retry
+          sessionStorage.removeItem('google_oauth_processed_code');
+          setError(err.message || 'Erro ao fazer login com Google');
+          showError(err.message || 'Erro ao fazer login com Google');
+          // Clean the URL even on error
+          window.history.replaceState({}, document.title, window.location.pathname);
+          setIsProcessingGoogleCode(false);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    processGoogleCallback();
+  }, [isAuthenticated, isProcessingGoogleCode]);
 
   const handleClose = () => {
     setIsClosing(true);
     setTimeout(() => {
       onClose();
       setIsClosing(false);
+      setMode(initialMode);
+      setForgotSuccess(false);
+      setForgotEmail('');
+      setError(null);
+      setShowVerificationNotice(false);
+      setRegisteredEmail('');
+      setUnverifiedEmail(null);
     }, 300);
   };
 
@@ -63,18 +157,56 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
     setRegisterData({ ...registerData, [e.target.name]: e.target.value });
   };
 
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/password-reset/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: forgotEmail, language: 'pt' })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Erro ao processar pedido');
+      }
+
+      setForgotSuccess(true);
+      setForgotEmail('');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao enviar email de recuperação');
+      showError(err.message || 'Erro ao enviar email de recuperação');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setUnverifiedEmail(null);
     setIsLoading(true);
 
     try {
       await login(loginData.email, loginData.password);
       success(`Bem-vindo de volta! 👋`);
       // Login successful - modal will close via useEffect
-    } catch (err) {
-      setError('Email ou password incorretos');
-      showError('Email ou password incorretos');
+    } catch (err: any) {
+      // Verificar se é erro de email não verificado
+      if (err.requiresEmailVerification) {
+        setUnverifiedEmail(err.email || loginData.email);
+        setError(err.message || 'Por favor, verifique o seu email antes de fazer login');
+        // NÃO mostrar toast - o aviso visual no modal é suficiente
+      } else {
+        setError(err.message || 'Email ou password incorretos');
+        showError(err.message || 'Email ou password incorretos');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -94,8 +226,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
 
     try {
       await register(registerData.name, registerData.email, registerData.password);
-      success(`Conta criada com sucesso! Bem-vindo, ${registerData.name}! 🎉`);
-      // Register successful - modal will close via useEffect
+      setRegisteredEmail(registerData.email);
+      setShowVerificationNotice(true);
+      setRegisterData({ name: '', email: '', password: '' });
+      // Don't show success toast, show verification notice instead
     } catch (err) {
       setError('Erro ao criar conta. Email pode já estar em uso.');
       showError('Erro ao criar conta. Email pode já estar em uso.');
@@ -103,6 +237,53 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
       setIsLoading(false);
     }
   };
+
+  // Google OAuth Login Handler
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async (codeResponse) => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Send the authorization code to the backend
+        const response = await fetch(`${API_BASE_URL}/auth/google/callback`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ code: codeResponse.code }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Erro ao fazer login com Google');
+        }
+
+        const data = await response.json();
+
+        // Store token and user data in localStorage
+        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('auth_user', JSON.stringify(data.user));
+
+        // Reload the page to update the auth context
+        window.location.reload();
+
+        success('Bem-vindo! Login efetuado com sucesso 🎉');
+      } catch (err: any) {
+        setError(err.message || 'Erro ao fazer login com Google');
+        showError(err.message || 'Erro ao fazer login com Google');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    onError: () => {
+      setError('Erro ao fazer login com Google');
+      showError('Erro ao fazer login com Google. Por favor, tente novamente.');
+    },
+    flow: 'auth-code',
+    ux_mode: 'redirect',
+    redirect_uri: window.location.origin,
+  });
 
   // Swipe handlers for mobile
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -133,12 +314,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
     setStartX(0);
   };
 
-  // Close modal automatically when user logs in
+  // Close modal automatically when user logs in (but not after register)
   React.useEffect(() => {
-    if (isAuthenticated && isOpen) {
+    if (isAuthenticated && isOpen && !showVerificationNotice) {
       handleClose();
     }
-  }, [isAuthenticated, isOpen]);
+  }, [isAuthenticated, isOpen, showVerificationNotice]);
 
   if (!isOpen || isAuthenticated) return null;
 
@@ -184,11 +365,38 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
 
             {mode === 'login' ? (
               <form onSubmit={handleLoginSubmit} className="space-y-6 flex-1 flex flex-col">
-                {error && (
+                {unverifiedEmail ? (
+                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
+                    <div className="flex items-start">
+                      <svg className="h-5 w-5 text-yellow-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-bold text-yellow-800 mb-1">
+                          ⚠️ Email não verificado
+                        </h4>
+                        <p className="text-xs text-yellow-700 mb-2">
+                          {error}
+                        </p>
+                        <p className="text-xs text-yellow-600 mb-3">
+                          Enviámos um email de verificação para <strong>{unverifiedEmail}</strong>. 
+                          Verifique a sua caixa de entrada (ou spam).
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {/* TODO: Resend verification */}}
+                          className="text-xs font-semibold text-yellow-800 underline hover:text-yellow-900"
+                        >
+                          Reenviar email de verificação
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : error ? (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                     {error}
                   </div>
-                )}
+                ) : null}
 
                 <FloatingLabelInput
                   id="login_email"
@@ -225,8 +433,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                       Lembrar-me
                     </label>
                   </div>
-                  <button type="button" className="text-sm text-primary-600 hover:text-primary-700 underline">
-                    Esqueceu a password?
+                  <button
+                    type="button"
+                    onClick={() => setMode('forgot')}
+                    className="text-sm text-red-500 hover:text-red-600 hover:underline transition-all"
+                  >
+                    Esqueceu a palavra-passe?
                   </button>
                 </div>
 
@@ -235,7 +447,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                 <div className="space-y-4">
                   <button
                     type="button"
-                    className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-300 text-gray-700 py-3 px-6 rounded-lg font-semibold text-sm hover:bg-gray-50 hover:shadow-md transition-all"
+                    onClick={() => handleGoogleLogin()}
+                    disabled={isLoading}
+                    className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-300 text-gray-700 py-3 px-6 rounded-lg font-semibold text-sm hover:bg-gray-50 hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <svg width="20" height="20" viewBox="0 0 17 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M16.9911 9.16838C16.9911 8.43093 16.9333 7.89279 16.8081 7.33472H8.66943V10.6632H13.4467C13.3504 11.4904 12.8303 12.7361 11.6745 13.5732L11.6583 13.6846L14.2316 15.7472L14.4099 15.7657C16.0472 14.201 16.9911 11.899 16.9911 9.16838Z" fill="#4285F4"/>
@@ -246,6 +460,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                     Entrar com Google
                   </button>
 
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-white text-gray-500">ou</span>
+                    </div>
+                  </div>
+
                   <button
                     type="submit"
                     disabled={isLoading}
@@ -255,6 +478,106 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                   </button>
                 </div>
               </form>
+            ) : mode === 'forgot' ? (
+              <div className="flex-1 flex flex-col">
+                <button
+                  onClick={() => setMode('login')}
+                  className="self-start flex items-center gap-2 text-primary-600 hover:text-primary-700 mb-4 transition-colors"
+                >
+                  <ArrowLeft size={18} />
+                  <span className="text-sm font-medium">Voltar</span>
+                </button>
+
+                {!forgotSuccess ? (
+                  <form onSubmit={handleForgotPasswordSubmit} className="space-y-6 flex-1 flex flex-col">
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Recuperar Palavra-passe
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Introduza o seu email para receber um link de recuperação.
+                      </p>
+                    </div>
+
+                    {error && (
+                      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                        {error}
+                      </div>
+                    )}
+
+                    <FloatingLabelInput
+                      id="forgot_email"
+                      name="email"
+                      type="email"
+                      label="Email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      required
+                      autoComplete="email"
+                      disabled={isLoading}
+                    />
+
+                    <div className="flex-1"></div>
+
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full bg-primary-600 text-white py-4 px-6 rounded-lg font-semibold text-sm uppercase hover:bg-primary-700 transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isLoading ? 'A enviar...' : 'Enviar Link de Recuperação'}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="flex-1 flex flex-col justify-center space-y-6">
+                    <div className="text-center space-y-4">
+                      <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                        <CheckCircle size={32} className="text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                          Email Enviado!
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          Se existir uma conta com este email, receberá um link de recuperação.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-lg p-6 space-y-3">
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                        Próximos Passos:
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="flex items-start gap-3">
+                          <svg className="w-5 h-5 text-primary-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <p className="text-sm text-gray-700">Verifique a sua caixa de entrada</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <svg className="w-5 h-5 text-primary-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <p className="text-sm text-gray-700">O link é válido por 15 minutos</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <svg className="w-5 h-5 text-primary-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <p className="text-sm text-gray-700">Verifique também o spam</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setMode('login')}
+                      className="w-full border-2 border-primary-600 text-primary-600 py-3 px-12 rounded-lg font-semibold text-sm uppercase hover:bg-primary-600 hover:text-white transition-all"
+                    >
+                      Voltar ao Login
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
                 <div className="space-y-3">
@@ -299,7 +622,78 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
           <div className="bg-white rounded-xl shadow-lg p-8 flex flex-col">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Criar Conta</h2>
 
-            {mode === 'register' ? (
+            {showVerificationNotice ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
+                <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center mb-4">
+                  <Mail className="h-10 w-10 text-primary-600" />
+                </div>
+                
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                    Conta Criada com Sucesso! 🎉
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Enviámos um email de verificação para:
+                  </p>
+                  <p className="text-primary-600 font-semibold mb-6">
+                    {registeredEmail}
+                  </p>
+                </div>
+
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg text-left w-full">
+                  <div className="flex items-start">
+                    <svg className="h-5 w-5 text-yellow-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-bold text-yellow-800 mb-2">
+                        ⚠️ Ação Necessária
+                      </h4>
+                      <p className="text-sm text-yellow-700 mb-2">
+                        <strong>Tem de verificar o seu email antes de aceder à sua conta.</strong>
+                      </p>
+                      <p className="text-xs text-yellow-600">
+                        A conta será automaticamente apagada em 1 hora se não for verificada.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 w-full">
+                  <p className="text-sm text-primary-900 font-semibold mb-3">
+                    Próximos Passos:
+                  </p>
+                  <ul className="space-y-2 text-sm text-primary-800">
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary-600 font-bold">1.</span>
+                      <span>Verifique a sua caixa de entrada</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary-600 font-bold">2.</span>
+                      <span>Clique no link de verificação (válido por 1 hora)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary-600 font-bold">3.</span>
+                      <span>Faça login para aceder à sua conta</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-gray-500">💡</span>
+                      <span className="text-xs text-gray-600">Não se esqueça de verificar a pasta de spam</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setShowVerificationNotice(false);
+                    setMode('login');
+                  }}
+                  className="w-full border-2 border-primary-600 text-primary-600 py-3 px-12 rounded-lg font-semibold text-sm uppercase hover:bg-primary-600 hover:text-white transition-all"
+                >
+                  Entendi, ir para Login
+                </button>
+              </div>
+            ) : mode === 'register' ? (
               <form onSubmit={handleRegisterSubmit} className="space-y-6 flex-1 flex flex-col">
                 {error && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
@@ -429,7 +823,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                 <div className="space-y-4">
                   <button
                     type="button"
-                    className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-300 text-gray-700 py-3 px-6 rounded-lg font-semibold text-sm hover:bg-gray-50 hover:shadow-md transition-all"
+                    onClick={() => handleGoogleLogin()}
+                    disabled={isLoading}
+                    className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-300 text-gray-700 py-3 px-6 rounded-lg font-semibold text-sm hover:bg-gray-50 hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <svg width="20" height="20" viewBox="0 0 17 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M16.9911 9.16838C16.9911 8.43093 16.9333 7.89279 16.8081 7.33472H8.66943V10.6632H13.4467C13.3504 11.4904 12.8303 12.7361 11.6745 13.5732L11.6583 13.6846L14.2316 15.7472L14.4099 15.7657C16.0472 14.201 16.9911 11.899 16.9911 9.16838Z" fill="#4285F4"/>
@@ -439,6 +835,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                     </svg>
                     Registar com Google
                   </button>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-white text-gray-500">ou</span>
+                    </div>
+                  </div>
 
                   <button
                     type="submit"
@@ -493,5 +898,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
     </>
   );
 };
+
+
 
 export default AuthModal;

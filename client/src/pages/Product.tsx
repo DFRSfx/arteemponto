@@ -2,14 +2,21 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ShoppingBag, Heart, Minus, Plus, Star, Share2, ChevronLeft, ChevronRight, Grid2x2 as Grid, Maximize2 } from 'lucide-react';
 import SEO from '../components/SEO';
-import { mockProducts } from '../data/products';
+import { useProduct } from '../hooks/useProducts';
+import { useProducts } from '../hooks/useProducts';
 import { useCart } from '../context/CartContext';
+import { useFavorites } from '../context/FavoritesContext';
 import ProductCard from '../components/ProductCard';
 import { getProductSchema, getBreadcrumbSchema } from '../utils/schemas';
+import { getAbsoluteImageUrl } from '../utils/imageUtils';
+import Toast, { ToastType } from '../components/Toast';
 
 const Product: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { addItem } = useCart();
+  const { favorites, addToFavorites, removeFromFavorites } = useFavorites();
+  const { product, loading, error } = useProduct(id || '');
+  const { products: allProducts } = useProducts();
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState('');
@@ -19,9 +26,8 @@ const Product: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [relatedViewMode, setRelatedViewMode] = useState<'grid' | 'fullscreen'>('grid');
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const imageRef = useRef<HTMLDivElement>(null);
-
-  const product = mockProducts.find(p => p.id === id);
 
   // Navigation functions for image slider (without loop)
   const goToNextImage = () => {
@@ -154,13 +160,33 @@ const Product: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [product]);
 
-  if (!product) {
+  // Loading state
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Produto não encontrado</h2>
-          <Link to="/loja" className="text-primary-600 hover:text-primary-700">
-            Voltar à loja
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">A carregar produto...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error or not found state
+  if (error || !product) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            {error || 'Produto não encontrado'}
+          </h2>
+          <Link to="/loja" className="inline-flex items-center px-6 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors">
+            Voltar à Loja
           </Link>
         </div>
       </div>
@@ -172,13 +198,66 @@ const Product: React.FC = () => {
     setSelectedColor(product.colors[0]);
   }
 
-  const relatedProducts = mockProducts
+  const relatedProducts = allProducts
     .filter(p => p.id !== product.id && p.category === product.category)
     .slice(0, 4);
 
   const handleAddToCart = () => {
     for (let i = 0; i < quantity; i++) {
       addItem(product, selectedColor);
+    }
+  };
+
+  const isFavorite = product ? favorites.some(fav => fav.product_id === String(product.id)) : false;
+
+  const handleToggleFavorite = async () => {
+    if (!product) return;
+
+    console.log('Toggle favorite - Product ID:', product.id);
+    console.log('Current favorites:', favorites);
+    console.log('Is favorite?', isFavorite);
+
+    if (isFavorite) {
+      console.log('Removing from favorites...');
+      await removeFromFavorites(String(product.id));
+    } else {
+      console.log('Adding to favorites...');
+      await addToFavorites(String(product.id));
+    }
+  };
+
+  const handleShare = async () => {
+    if (!product) return;
+
+    const shareUrl = window.location.href;
+    const shareTitle = product.name;
+    const shareText = `${product.name} - ${product.description.substring(0, 100)}...`;
+
+    // Check if Web Share API is available (mobile devices)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl,
+        });
+        setToast({ message: 'Produto partilhado com sucesso!', type: 'success' });
+      } catch (error: any) {
+        // User cancelled share or error occurred
+        if (error.name !== 'AbortError') {
+          console.error('Error sharing:', error);
+          setToast({ message: 'Erro ao partilhar produto', type: 'error' });
+        }
+      }
+    } else {
+      // Fallback: Copy to clipboard for desktop
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setToast({ message: 'Link copiado para a área de transferência!', type: 'success' });
+      } catch (error) {
+        console.error('Error copying to clipboard:', error);
+        setToast({ message: 'Erro ao copiar link', type: 'error' });
+      }
     }
   };
 
@@ -209,7 +288,7 @@ const Product: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-gray-600 mb-8">
-          <Link to="/" className="hover:text-primary-600">Home</Link>
+          <Link to="/" className="hover:text-primary-600">Início</Link>
           <span>/</span>
           <Link to="/loja" className="hover:text-primary-600">Loja</Link>
           <span>/</span>
@@ -254,7 +333,7 @@ const Product: React.FC = () => {
                   {product.images.map((image, index) => (
                     <img
                       key={index}
-                      src={image}
+                      src={getAbsoluteImageUrl(image)}
                       alt={`${product.name} ${index + 1}`}
                       className="w-full h-full object-cover flex-shrink-0"
                       draggable={false}
@@ -327,7 +406,7 @@ const Product: React.FC = () => {
                       }`}
                     >
                       <img
-                        src={image}
+                        src={getAbsoluteImageUrl(image)}
                         alt={`${product.name} ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
@@ -433,12 +512,24 @@ const Product: React.FC = () => {
                 </button>
 
                 <div className="flex gap-4">
-                  <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 hover:border-gray-400 hover:scale-105 transition-all duration-300">
-                    <Heart className="h-5 w-5 flex-shrink-0" />
-                    <span className="whitespace-nowrap text-sm font-medium">Favoritar</span>
+                  <button 
+                    onClick={handleToggleFavorite}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 border rounded-md hover:scale-105 transition-all duration-300 ${
+                      isFavorite
+                        ? 'border-primary-600 bg-primary-50 text-primary-600 hover:bg-primary-100'
+                        : 'border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                    }`}
+                  >
+                    <Heart className={`h-5 w-5 flex-shrink-0 ${isFavorite ? 'fill-current' : ''}`} />
+                    <span className="whitespace-nowrap text-sm font-medium">
+                      {isFavorite ? 'Remover' : 'Favoritar'}
+                    </span>
                   </button>
 
-                  <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 hover:border-gray-400 hover:scale-105 transition-all duration-300">
+                  <button
+                    onClick={handleShare}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 hover:border-gray-400 hover:scale-105 transition-all duration-300"
+                  >
                     <Share2 className="h-5 w-5 flex-shrink-0" />
                     <span className="whitespace-nowrap text-sm font-medium">Partilhar</span>
                   </button>
@@ -515,6 +606,15 @@ const Product: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };

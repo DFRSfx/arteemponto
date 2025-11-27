@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "WebFetch(domain:duckdb.org)",
+      "WebSearch",
+      "Bash(npm install:*)",
+      "Bash(timeout 3 npm run dev:*)",
+      "Bash(sqlite3:*)",
+      "Bash(node add-colors-field.js:*)",
+      "Bash(node -e:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:eupago.readme.io)"
     ],
     "deny": [],
     "ask": []

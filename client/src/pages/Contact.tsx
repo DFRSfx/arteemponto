@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Instagram, Send } from 'lucide-react';
+import { Mail, Phone, MapPin, Instagram, Send, ChevronDown } from 'lucide-react';
 import SEO from '../components/SEO';
 import { getLocalBusinessSchema, getFAQSchema } from '../utils/schemas';
 
@@ -16,8 +16,6 @@ const Contact: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Simulate form submission
     setTimeout(() => {
       setIsSubmitting(false);
       setSubmitted(true);
@@ -25,7 +23,9 @@ const Contact: React.FC = () => {
     }, 1000);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
@@ -40,7 +40,7 @@ const Contact: React.FC = () => {
     },
     {
       question: 'Fazem entregas em todo o país?',
-      answer: 'Sim! Fazemos entregas em todo Portugal continental e ilhas. Envio grátis em compras acima de €30.',
+      answer: 'Sim! Fazemos entregas em todo Portugal continental e ilhas.',
     },
     {
       question: 'Que materiais utilizam?',
@@ -69,9 +69,7 @@ const Contact: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Entre em Contacto
-          </h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Entre em Contacto</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Tem alguma dúvida sobre os nossos produtos ou gostaria de fazer um pedido personalizado? 
             Estamos aqui para ajudar!
@@ -83,7 +81,6 @@ const Contact: React.FC = () => {
           <div>
             <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
               <h2 className="text-2xl font-semibold mb-6">Informações de Contacto</h2>
-              
               <div className="space-y-6">
                 <div className="flex items-start">
                   <Phone className="h-6 w-6 text-primary-600 mt-1 mr-4 flex-shrink-0" />
@@ -98,16 +95,17 @@ const Contact: React.FC = () => {
                   <Mail className="h-6 w-6 text-primary-600 mt-1 mr-4 flex-shrink-0" />
                   <div>
                     <h3 className="font-semibold text-gray-900">Email</h3>
-                    <a 
+                    <a
                       href="mailto:info@arteemponto.pt"
                       className="text-gray-600 hover:text-primary-600 transition-colors"
                     >
-                      info@arteemponto.pt
+                      info@arteemponto.pt {/* Fixed: no Markdown! */}
                     </a>
                     <p className="text-sm text-gray-500">Respondemos em 24h</p>
                   </div>
                 </div>
 
+                {/* Uncomment if you want location info
                 <div className="flex items-start">
                   <MapPin className="h-6 w-6 text-primary-600 mt-1 mr-4 flex-shrink-0" />
                   <div>
@@ -116,12 +114,13 @@ const Contact: React.FC = () => {
                     <p className="text-sm text-gray-500">Entregas em todo o país</p>
                   </div>
                 </div>
+                */}
 
                 <div className="flex items-start">
                   <Instagram className="h-6 w-6 text-primary-600 mt-1 mr-4 flex-shrink-0" />
                   <div>
                     <h3 className="font-semibold text-gray-900">Instagram</h3>
-                    <a 
+                    <a
                       href="https://www.instagram.com/arteemponto.croche/"
                       target="_blank"
                       rel="noopener noreferrer"
@@ -134,32 +133,12 @@ const Contact: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            {/* Business Hours */}
-            <div className="bg-primary-50 rounded-lg p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Horário de Atendimento</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>Segunda a Sexta</span>
-                  <span className="font-medium">9h00 - 18h00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Sábado</span>
-                  <span className="font-medium">10h00 - 16h00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Domingo</span>
-                  <span className="font-medium text-red-600">Encerrado</span>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Contact Form */}
           <div>
             <div className="bg-white rounded-lg shadow-sm p-8">
               <h2 className="text-2xl font-semibold mb-6">Envie-nos uma Mensagem</h2>
-              
               {submitted ? (
                 <div className="text-center py-8">
                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -194,7 +173,6 @@ const Contact: React.FC = () => {
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
                       />
                     </div>
-                    
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Email *
@@ -214,20 +192,23 @@ const Contact: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Assunto *
                     </label>
-                    <select
-                      name="subject"
-                      required
-                      value={formData.subject}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-                    >
-                      <option value="">Selecione um assunto</option>
-                      <option value="produto">Dúvida sobre produto</option>
-                      <option value="pedido">Estado do pedido</option>
-                      <option value="personalizado">Pedido personalizado</option>
-                      <option value="geral">Informação geral</option>
-                      <option value="outro">Outro</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        name="subject"
+                        required
+                        value={formData.subject}
+                        onChange={handleInputChange}
+                        className="w-full appearance-none px-4 py-2.5 pr-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white text-gray-900 cursor-pointer transition-all hover:border-gray-400"
+                      >
+                        <option value="" disabled className="text-gray-400">Selecione um assunto</option>
+                        <option value="produto" className="py-2">🛍️ Dúvida sobre produto</option>
+                        <option value="pedido" className="py-2">📦 Estado do pedido</option>
+                        <option value="personalizado" className="py-2">✨ Pedido personalizado</option>
+                        <option value="geral" className="py-2">💬 Informação geral</option>
+                        <option value="outro" className="py-2">📝 Outro</option>
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
 
                   <div>
@@ -240,8 +221,9 @@ const Contact: React.FC = () => {
                       required
                       value={formData.message}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-y transition-all hover:border-gray-400"
                       placeholder="Como podemos ajudar?"
+                      style={{ minHeight: '44px', maxHeight: '275px' }}
                     />
                   </div>
 
@@ -275,7 +257,6 @@ const Contact: React.FC = () => {
               Respostas às dúvidas mais comuns dos nossos clientes
             </p>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h3 className="font-semibold text-gray-900 mb-2">
@@ -285,31 +266,20 @@ const Contact: React.FC = () => {
                 Os pedidos personalizados levam entre 2 a 4 semanas, dependendo da complexidade do projeto.
               </p>
             </div>
-
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h3 className="font-semibold text-gray-900 mb-2">
                 Fazem entregas em todo o país?
               </h3>
               <p className="text-gray-600">
-                Sim! Fazemos entregas em todo Portugal continental e ilhas. Envio grátis em compras acima de €30.
+                Sim! Fazemos entregas em todo Portugal continental e ilhas.
               </p>
             </div>
-
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h3 className="font-semibold text-gray-900 mb-2">
                 Que materiais utilizam?
               </h3>
               <p className="text-gray-600">
                 Utilizamos apenas linhas de alta qualidade, preferencialmente 100% algodão, adequadas para cada tipo de produto.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="font-semibold text-gray-900 mb-2">
-                Posso devolver um produto?
-              </h3>
-              <p className="text-gray-600">
-                Sim, aceitamos devoluções até 30 dias após a compra, desde que o produto esteja em perfeitas condições.
               </p>
             </div>
           </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ordersApi } from '../../utils/apiHelpers';
 import { ArrowLeft, Package, User, MapPin, CreditCard, Calendar } from 'lucide-react';
+import { getAbsoluteImageUrl } from '../../utils/imageUtils';
 
 interface OrderItem {
   id: number;
@@ -97,8 +98,9 @@ export default function OrderDetails() {
     <div className="space-y-6">
       <div className="flex items-center space-x-4">
         <button
-          onClick={() => navigate('/admin/orders')}
-          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          onClick={() => navigate('/admin/encomendas')}
+          className="p-3 text-gray-600 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+          aria-label="Voltar"
         >
           <ArrowLeft size={24} />
         </button>
@@ -118,7 +120,7 @@ export default function OrderDetails() {
               {order.order_items.map((item) => (
                 <div key={item.id} className="flex items-center space-x-4 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
                   <img
-                    src={item.product.image}
+                    src={item.product.images && item.product.images.length > 0 ? getAbsoluteImageUrl(item.product.images[0]) : '/placeholder.png'}
                     alt={item.product.name}
                     className="w-20 h-20 object-cover rounded-lg"
                   />

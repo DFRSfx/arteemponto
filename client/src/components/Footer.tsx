@@ -70,10 +70,6 @@ const Footer: React.FC = () => {
                 <Mail className="h-4 w-4 mr-2" />
                 <span>info@arteemponto.pt</span>
               </li>
-              <li className="flex items-start">
-                <MapPin className="h-4 w-4 mr-2 mt-1" />
-                <span>Porto, Portugal</span>
-              </li>
             </ul>
           </div>
         </div>

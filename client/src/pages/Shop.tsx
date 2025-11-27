@@ -1,18 +1,21 @@
 import React, { useState, useMemo } from 'react';
 import { Filter, Search, Grid2x2 as Grid, List, Maximize2 } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import SEO from '../components/SEO';
 import ProductCard from '../components/ProductCard';
 import FilterModal from '../components/FilterModal';
-import { mockProducts } from '../data/products';
+import { useProducts } from '../hooks/useProducts';
+import { useCategories } from '../hooks/useCategories';
 import { getItemListSchema, getBreadcrumbSchema } from '../utils/schemas';
 
 const PRODUCTS_PER_LOAD = 8;
 
 const Shop: React.FC = () => {
-  const location = useLocation();
+  const { categorySlug } = useParams<{ categorySlug?: string }>();
+  const navigate = useNavigate();
+  const { products: allProducts, loading, error } = useProducts();
+  const { categories: allCategories } = useCategories();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
   const [sortBy, setSortBy] = useState('name');
@@ -20,22 +23,36 @@ const Shop: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'fullscreen'>('grid');
   const [displayCount, setDisplayCount] = useState(PRODUCTS_PER_LOAD);
 
-  const categories = [...new Set(mockProducts.map(p => p.category))];
-  const colors = [...new Set(mockProducts.flatMap(p => p.colors))];
+  // Get category name from slug
+  const selectedCategory = React.useMemo(() => {
+    if (!categorySlug) return '';
 
-  // Check URL params for category filter
-  React.useEffect(() => {
-    const urlParams = new URLSearchParams(location.search);
-    const categoryParam = urlParams.get('categoria');
-    if (categoryParam) {
-      setSelectedCategory(decodeURIComponent(categoryParam));
+    const category = allCategories.find(cat => {
+      // Create slug from category name for comparison (lowercase, replace spaces with hyphens)
+      const catSlug = cat.name.toLowerCase().replace(/\s+/g, '-');
+      return catSlug === categorySlug.toLowerCase();
+    });
+
+    return category ? category.name : '';
+  }, [categorySlug, allCategories]);
+
+  const categories = [...new Set(allProducts.map(p => p.category))];
+  const colors = [...new Set(allProducts.flatMap(p => p.colors))];
+
+  // Handle category change and sync with URL
+  const handleCategoryChange = (category: string) => {
+    if (!category) {
+      // No category - go to /loja
+      navigate('/loja');
     } else {
-      setSelectedCategory('');
+      // Create slug from category name
+      const slug = category.toLowerCase().replace(/\s+/g, '-');
+      navigate(`/loja/${slug}`);
     }
-  }, [location.search]);
+  };
 
   const filteredProducts = useMemo(() => {
-    let filtered = mockProducts.filter(product => {
+    let filtered = allProducts.filter(product => {
       // Handle URL filter parameters
       const urlParams = new URLSearchParams(window.location.search);
       const filterParam = urlParams.get('filter');
@@ -71,7 +88,7 @@ const Shop: React.FC = () => {
     });
 
     return filtered;
-  }, [searchTerm, selectedCategory, selectedColor, priceRange, sortBy]);
+  }, [allProducts, searchTerm, selectedCategory, selectedColor, priceRange, sortBy]);
 
   // Get products to display
   const currentProducts = filteredProducts.slice(0, displayCount);
@@ -111,8 +128,43 @@ const Shop: React.FC = () => {
     setSearchTerm('');
     setSelectedColor('');
     setPriceRange([0, 100]);
-    // Não limpa selectedCategory pois vem do navbar
+    handleCategoryChange(''); // Clear category and update URL
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">A carregar produtos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Erro ao Carregar</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+          >
+            Tentar Novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -129,7 +181,7 @@ const Shop: React.FC = () => {
         sortBy={sortBy}
         onSortChange={setSortBy}
         selectedCategory={selectedCategory}
-        onCategoryChange={setSelectedCategory}
+        onCategoryChange={handleCategoryChange}
         categories={categories}
         selectedColor={selectedColor}
         onColorChange={setSelectedColor}
@@ -218,7 +270,7 @@ const Shop: React.FC = () => {
             {filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}
           </p>
           
-          {(searchTerm || selectedColor || priceRange[0] !== 0 || priceRange[1] !== 100) && (
+          {(searchTerm || selectedCategory || selectedColor || priceRange[0] !== 0 || priceRange[1] !== 100) && (
             <button
               onClick={handleClearFilters}
               className="text-primary-600 hover:text-primary-700 font-medium"

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, ShoppingBag, Heart, Minus, Plus } from 'lucide-react';
 import { Product } from '../types';
 import { useCart } from '../context/CartContext';
+import { getAbsoluteImageUrl } from '../utils/imageUtils';
 
 interface ProductModalProps {
   product: Product;
@@ -42,7 +43,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
             <div>
               <div className="aspect-square mb-4 overflow-hidden rounded-lg">
                 <img
-                  src={product.images[selectedImage]}
+                  src={getAbsoluteImageUrl(product.images[selectedImage])}
                   alt={product.name}
                   className="w-full h-full object-cover"
                 />
@@ -59,7 +60,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
                       }`}
                     >
                       <img
-                        src={image}
+                        src={getAbsoluteImageUrl(image)}
                         alt={`${product.name} ${index + 1}`}
                         className="w-full h-full object-cover"
                       />

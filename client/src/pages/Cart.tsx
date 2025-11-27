@@ -110,7 +110,7 @@ const Cart: React.FC = () => {
 
               <div className="space-y-3">
                 <Link
-                  to="/checkout"
+                  to="/finalizar-compra"
                   className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white py-3 px-6 rounded-md hover:bg-primary-700 transition-colors font-semibold"
                 >
                   Finalizar Compra
@@ -128,10 +128,6 @@ const Cart: React.FC = () => {
               {/* Trust Badges */}
               <div className="mt-6 pt-6 border-t">
                 <div className="space-y-2 text-sm text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span>Envio grátis em compras acima de €30</span>
-                  </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                     <span>Pagamento 100% seguro</span>
