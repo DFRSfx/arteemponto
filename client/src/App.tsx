@@ -9,6 +9,8 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
 import GlobalConfirmModal from './components/GlobalConfirmModal';
+import MarketingConsent from './components/MarketingConsent'; // <--- IMPORTAR AQUI
+
 import Home from './pages/Home';
 import Shop from './pages/Shop';
 import Product from './pages/Product';
@@ -37,41 +39,43 @@ function App() {
           <FavoritesProvider>
             <CartProvider>
               <Router>
-          <ScrollToTop />
-          <GlobalConfirmModal />
-          <Routes>
-            {/* Admin Routes */}
-            <Route path="/admin/*" element={<AdminApp />} />
+                <ScrollToTop />
+                <GlobalConfirmModal />
+                <MarketingConsent /> {/* <--- ADICIONAR AQUI */}
+                
+                <Routes>
+                  {/* Admin Routes */}
+                  <Route path="/admin/*" element={<AdminApp />} />
 
-            {/* Public Routes */}
-            <Route path="/*" element={
-              <div className="flex flex-col min-h-screen">
-                <Navbar />
-                <main className="flex-1">
-                  <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/loja" element={<Shop />} />
-                    <Route path="/loja/:categorySlug" element={<Shop />} />
-                    <Route path="/produto/:id" element={<Product />} />
-                    <Route path="/carrinho" element={<Cart />} />
-                    <Route path="/finalizar-compra" element={<Checkout />} />
-                    <Route path="/checkout/success" element={<CheckoutSuccess />} />
-                    <Route path="/checkout/fail" element={<CheckoutFail />} />
-                    <Route path="/contacto" element={<Contact />} />
-                    <Route path="/perfil" element={<Profile />} />
-                    <Route path="/encomendas" element={<Orders />} />
-                    <Route path="/favoritos" element={<Favorites />} />
-                    <Route path="/verificar-email" element={<VerifyEmail />} />
-                    <Route path="/redefinir-senha" element={<ResetPassword />} />
-                    <Route path="/track-order/:token" element={<TrackOrder />} />
-                    {/* <Route path="/sobre" element={<About />} /> */}
-                  </Routes>
-                </main>
-                <Footer />
-              </div>
-            } />
-          </Routes>
-          </Router>
+                  {/* Public Routes */}
+                  <Route path="/*" element={
+                    <div className="flex flex-col min-h-screen">
+                      <Navbar />
+                      <main className="flex-1">
+                        <Routes>
+                          <Route path="/" element={<Home />} />
+                          <Route path="/loja" element={<Shop />} />
+                          <Route path="/loja/:categorySlug" element={<Shop />} />
+                          <Route path="/produto/:id" element={<Product />} />
+                          <Route path="/carrinho" element={<Cart />} />
+                          <Route path="/finalizar-compra" element={<Checkout />} />
+                          <Route path="/checkout/success" element={<CheckoutSuccess />} />
+                          <Route path="/checkout/fail" element={<CheckoutFail />} />
+                          <Route path="/contacto" element={<Contact />} />
+                          <Route path="/perfil" element={<Profile />} />
+                          <Route path="/encomendas" element={<Orders />} />
+                          <Route path="/favoritos" element={<Favorites />} />
+                          <Route path="/verificar-email" element={<VerifyEmail />} />
+                          <Route path="/redefinir-senha" element={<ResetPassword />} />
+                          <Route path="/track-order/:token" element={<TrackOrder />} />
+                          {/* <Route path="/sobre" element={<About />} /> */}
+                        </Routes>
+                      </main>
+                      <Footer />
+                    </div>
+                  } />
+                </Routes>
+              </Router>
             </CartProvider>
           </FavoritesProvider>
         </ToastProvider>

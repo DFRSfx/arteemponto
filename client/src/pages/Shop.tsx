@@ -264,21 +264,23 @@ const Shop: React.FC = () => {
 
         </div>
 
-        {/* Results */}
-        <div className="flex items-center justify-between mb-6">
-          <p className="text-gray-600">
-            {filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}
-          </p>
-          
-          {(searchTerm || selectedCategory || selectedColor || priceRange[0] !== 0 || priceRange[1] !== 100) && (
-            <button
-              onClick={handleClearFilters}
-              className="text-primary-600 hover:text-primary-700 font-medium"
-            >
-              Limpar Filtros
-            </button>
-          )}
-        </div>
+        {/* Results - Only show if there are products */}
+        {filteredProducts.length > 0 && (
+          <div className="flex items-center justify-between mb-6">
+            <p className="text-gray-600">
+              {filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}
+            </p>
+            
+            {(searchTerm || selectedCategory || selectedColor || priceRange[0] !== 0 || priceRange[1] !== 100) && (
+              <button
+                onClick={handleClearFilters}
+                className="text-primary-600 hover:text-primary-700 font-medium"
+              >
+                Limpar Filtros
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Products Grid */}
         {viewMode === 'fullscreen' ? (
@@ -326,14 +328,24 @@ const Shop: React.FC = () => {
           </div>
         )}
 
+        {/* Empty State - Enhanced UI */}
         {filteredProducts.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-lg text-gray-500 mb-4">
-              Nenhum produto encontrado com os filtros selecionados
+          <div className="text-center py-16 bg-white rounded-lg border border-gray-100 shadow-sm mt-8">
+            <div className="flex justify-center mb-4">
+              <div className="p-4 bg-gray-50 rounded-full">
+                <Search className="h-8 w-8 text-gray-400" />
+              </div>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Nenhum produto encontrado
+            </h3>
+            <p className="text-gray-500 mb-6 max-w-md mx-auto">
+              Não encontramos produtos correspondentes aos seus filtros. 
+              Tente limpar os filtros ou buscar por outro termo.
             </p>
             <button
               onClick={handleClearFilters}
-              className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+              className="px-6 py-2.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors shadow-sm font-medium"
             >
               Ver Todos os Produtos
             </button>
