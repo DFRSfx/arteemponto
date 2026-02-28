@@ -11,7 +11,8 @@
     "start:dev": "cross-env NODE_ENV=development node dist/index.js",
     "typecheck": "tsc --noEmit",
     "cleanup-tokens": "tsx src/cleanup-tokens.ts",
-    "optimize-images": "tsx src/optimize-existing-images.ts"
+    "optimize-images": "tsx src/optimize-existing-images.ts",
+    "migrate-images": "tsx src/migrate-images-to-disk.ts"
   },
   "keywords": [
     "admin",
@@ -37,7 +38,9 @@
     "nodemailer": "^7.0.10",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "sharp": "^0.34.4"
+    "resend": "^6.9.2",
+    "sharp": "^0.34.4",
+    "stripe": "^20.4.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
