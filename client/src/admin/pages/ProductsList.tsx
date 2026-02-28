@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { productsApi } from '../../utils/apiHelpers';
 import { Plus, Edit, Trash2, Search } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
-import { getAbsoluteImageUrl } from '../../utils/imageUtils';
+import { getAbsoluteImageUrl, imgVariant } from '../../utils/imageUtils';
 
 interface Product {
   id: number;
@@ -147,7 +147,7 @@ export default function ProductsList() {
                     <div className="flex items-center space-x-3">
                       {product.images && product.images.length > 0 ? (
                         <img
-                          src={getAbsoluteImageUrl(product.images[0])}
+                          src={getAbsoluteImageUrl(imgVariant(product.images[0], 'sm'))}
                           alt={product.name}
                           className="w-12 h-12 object-cover rounded-lg flex-shrink-0"
                           onError={(e) => {
@@ -233,7 +233,7 @@ export default function ProductsList() {
               <div className="flex-shrink-0">
                 {product.images && product.images.length > 0 ? (
                   <img
-                    src={getAbsoluteImageUrl(product.images[0])}
+                    src={getAbsoluteImageUrl(imgVariant(product.images[0], 'sm'))}
                     alt={product.name}
                     className="w-20 h-20 object-cover rounded-lg"
                     onError={(e) => {

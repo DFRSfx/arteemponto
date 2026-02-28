@@ -8,7 +8,7 @@ import { useCart } from '../context/CartContext';
 import { useFavorites } from '../context/FavoritesContext';
 import ProductCard from '../components/ProductCard';
 import { getProductSchema, getBreadcrumbSchema } from '../utils/schemas';
-import { getAbsoluteImageUrl } from '../utils/imageUtils';
+import { getAbsoluteImageUrl, imgVariant } from '../utils/imageUtils';
 import Toast, { ToastType } from '../components/Toast';
 import CartToast from '../components/CartToast';
 
@@ -208,7 +208,7 @@ const Product: React.FC = () => {
     for (let i = 0; i < quantity; i++) {
       addItem(product, selectedColor);
     }
-    setCartToast({ name: product.name, image: product.images[0], type: 'added' });
+    setCartToast({ name: product.name, image: imgVariant(product.images[0], 'sm'), type: 'added' });
   };
 
   const isFavorite = product ? favorites.some(fav => fav.product_id === String(product.id)) : false;
@@ -411,7 +411,7 @@ const Product: React.FC = () => {
                       }`}
                     >
                       <img
-                        src={getAbsoluteImageUrl(image)}
+                        src={getAbsoluteImageUrl(imgVariant(image, 'sm'))}
                         alt={`${product.name} ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
@@ -520,10 +520,10 @@ const Product: React.FC = () => {
                           const newQty = (cartItem!.quantity) - 1;
                           if (newQty <= 0) {
                             removeItem(cartItem!.product.id);
-                            setCartToast({ name: product.name, image: product.images[0], type: 'removed' });
+                            setCartToast({ name: product.name, image: imgVariant(product.images[0], 'sm'), type: 'removed' });
                           } else {
                             updateQuantity(cartItem!.product.id, newQty);
-                            setCartToast({ name: product.name, image: product.images[0], type: 'updated' });
+                            setCartToast({ name: product.name, image: imgVariant(product.images[0], 'sm'), type: 'updated' });
                           }
                         }}
                         className="w-12 sm:w-[52px] flex items-center justify-center text-primary-700 hover:bg-primary-50 active:bg-primary-100 transition-colors focus:outline-none"
@@ -547,7 +547,7 @@ const Product: React.FC = () => {
                       <button
                         onClick={() => {
                           updateQuantity(cartItem!.product.id, cartItem!.quantity + 1);
-                          setCartToast({ name: product.name, image: product.images[0], type: 'updated' });
+                          setCartToast({ name: product.name, image: imgVariant(product.images[0], 'sm'), type: 'updated' });
                         }}
                         className="w-12 sm:w-[52px] flex items-center justify-center text-primary-700 hover:bg-primary-50 active:bg-primary-100 transition-colors focus:outline-none"
                         aria-label="Aumentar quantidade no carrinho"

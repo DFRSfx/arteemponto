@@ -1,7 +1,8 @@
 import express from 'express';
 import pool from '../config/database.js';
 import { requireAdmin, AuthRequest } from '../middleware/auth.js';
-import { upload, processImages } from '../config/upload.js';
+import { upload } from '../config/upload.js';
+import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -16,14 +17,32 @@ const router = express.Router();
 const getProductDir = (productId: number): string =>
   path.join(__dirname, '../../public/produtos', String(productId));
 
-const saveImageToDisk = (productId: number, buffer: Buffer, index: number): string => {
+const saveImageToDisk = async (productId: number, buffer: Buffer, index: number): Promise<string> => {
   const dir = getProductDir(productId);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  const filename = `image-${index}-${productId}.webp`;
-  fs.writeFileSync(path.join(dir, filename), buffer);
-  return `/produtos/${productId}/${filename}`;
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+  const base = `image-${index}-${productId}`;
+  const opts = { effort: 6, smartSubsample: true };
+
+  // lg — product detail page (max 1200 px, quality 85)
+  await sharp(buffer)
+    .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 85, ...opts })
+    .toFile(path.join(dir, `${base}.webp`));
+
+  // md — shop grid (max 600 px, quality 82)
+  await sharp(buffer)
+    .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 82, ...opts })
+    .toFile(path.join(dir, `${base}-md.webp`));
+
+  // sm — admin / cart thumbnails (max 280 px, quality 75)
+  await sharp(buffer)
+    .resize(280, 280, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 75, ...opts })
+    .toFile(path.join(dir, `${base}-sm.webp`));
+
+  return `/produtos/${productId}/${base}.webp`;
 };
 
 const getNextImageIndex = (productId: number): number => {
@@ -97,7 +116,6 @@ router.post(
   '/',
   ...requireAdmin,
   upload.array('images', 10),
-  processImages,
   async (req: AuthRequest, res) => {
     try {
       const { name, description, price, category, stock, featured, colors } = req.body;
@@ -129,10 +147,10 @@ router.post(
       );
       const productId = result.insertId;
 
-      // Save each image to disk
+      // Save each image to disk (generates lg / md / sm variants)
       const imagePaths: string[] = [];
       for (let i = 0; i < files.length; i++) {
-        imagePaths.push(saveImageToDisk(productId, files[i].buffer, i + 1));
+        imagePaths.push(await saveImageToDisk(productId, files[i].buffer, i + 1));
       }
 
       // Store paths in products table
@@ -162,7 +180,6 @@ router.put(
   '/:id',
   ...requireAdmin,
   upload.array('images', 10),
-  processImages,
   async (req: AuthRequest, res) => {
     try {
       console.log('🔄 UPDATE Product ID:', req.params.id);
@@ -213,24 +230,27 @@ router.put(
         }
       }
 
-      // Delete files that were removed by the admin
+      // Delete files that were removed by the admin (including md/sm variants)
       const dir = getProductDir(productId);
       for (const currentPath of currentImages) {
         if (!keepPaths.includes(currentPath)) {
-          const filepath = path.join(dir, path.basename(currentPath));
-          if (fs.existsSync(filepath)) {
-            fs.unlinkSync(filepath);
-            console.log('🗑️ Deleted image:', path.basename(currentPath));
+          const baseName = path.basename(currentPath, '.webp');
+          for (const suffix of ['', '-md', '-sm']) {
+            const filepath = path.join(dir, `${baseName}${suffix}.webp`);
+            if (fs.existsSync(filepath)) {
+              fs.unlinkSync(filepath);
+              console.log('🗑️ Deleted image:', `${baseName}${suffix}.webp`);
+            }
           }
         }
       }
 
-      // Save new uploaded images
+      // Save new uploaded images (generates lg / md / sm variants)
       const newPaths: string[] = [];
       if (files && files.length > 0) {
         let nextIndex = getNextImageIndex(productId);
         for (const file of files) {
-          newPaths.push(saveImageToDisk(productId, file.buffer, nextIndex));
+          newPaths.push(await saveImageToDisk(productId, file.buffer, nextIndex));
           nextIndex++;
         }
       }

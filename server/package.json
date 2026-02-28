@@ -11,8 +11,9 @@
     "start:dev": "cross-env NODE_ENV=development node dist/index.js",
     "typecheck": "tsc --noEmit",
     "cleanup-tokens": "tsx src/cleanup-tokens.ts",
-    "optimize-images": "tsx src/optimize-existing-images.ts",
-    "migrate-images": "tsx src/migrate-images-to-disk.ts"
+    "migrate-images": "tsx src/migrate-images-to-disk.ts",
+    "generate-image-variants": "tsx src/generate-image-variants.ts",
+    "generate-hero-slide-variants": "tsx src/generate-hero-slide-variants.ts"
   },
   "keywords": [
     "admin",
@@ -22,7 +23,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@api/eupago": "file:.api/apis/eupago",
     "@types/passport": "^1.0.17",
     "@types/passport-google-oauth20": "^2.0.17",
     "bcrypt": "^5.1.1",

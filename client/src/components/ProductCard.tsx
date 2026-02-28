@@ -4,7 +4,7 @@ import { ShoppingBag, Heart, Eye, ChevronLeft, ChevronRight } from 'lucide-react
 import { Product } from '../types';
 import { useCart } from '../context/CartContext';
 import { useFavorites } from '../context/FavoritesContext';
-import { getAbsoluteImageUrl } from '../utils/imageUtils';
+import { getAbsoluteImageUrl, imgVariant } from '../utils/imageUtils';
 
 interface ProductCardProps {
   product: Product;
@@ -142,7 +142,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
                   className="w-full h-full flex-shrink-0"
                 >
                   <img
-                    src={getAbsoluteImageUrl(image)}
+                    src={getAbsoluteImageUrl(imgVariant(image, 'md'))}
                     alt={`${product.name} - ${index + 1}`}
                     className="w-full h-full object-cover pointer-events-none"
                     draggable={false}
@@ -294,7 +294,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
                   className="w-full h-full flex-shrink-0"
                 >
                   <img
-                    src={getAbsoluteImageUrl(image)}
+                    src={getAbsoluteImageUrl(imgVariant(image, 'md'))}
                     alt={`${product.name} - ${index + 1}`}
                     className="w-full h-full object-cover pointer-events-none"
                     draggable={false}
@@ -443,7 +443,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
                 className="w-full h-full flex-shrink-0"
               >
                 <img
-                  src={getAbsoluteImageUrl(image)}
+                  src={getAbsoluteImageUrl(imgVariant(image, 'md'))}
                   alt={`${product.name} - ${index + 1}`}
                   className="w-full h-full object-cover pointer-events-none"
                   draggable={false}

@@ -2,7 +2,7 @@ import React from 'react';
 import { Minus, Plus, X } from 'lucide-react';
 import { CartItem as CartItemType } from '../types';
 import { useCart } from '../context/CartContext';
-import { getAbsoluteImageUrl } from '../utils/imageUtils';
+import { getAbsoluteImageUrl, imgVariant } from '../utils/imageUtils';
 
 interface CartItemProps {
   item: CartItemType;
@@ -14,7 +14,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, onNotify }) => {
 
   const handleQuantityChange = (newQuantity: number) => {
     if (newQuantity <= 0) {
-      onNotify?.(item.product.name, item.product.images?.[0], 'removed');
+      onNotify?.(item.product.name, imgVariant(item.product.images?.[0] ?? '', 'sm'), 'removed');
       removeItem(item.product.id);
     } else {
       updateQuantity(item.product.id, newQuantity);
@@ -27,7 +27,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, onNotify }) => {
         {/* Product Image */}
         <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 overflow-hidden rounded-lg">
           <img
-            src={getAbsoluteImageUrl(item.product.images[0])}
+            src={getAbsoluteImageUrl(imgVariant(item.product.images[0], 'sm'))}
             alt={item.product.name}
             className="w-full h-full object-cover"
           />
@@ -50,7 +50,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, onNotify }) => {
             
             <button
               onClick={() => {
-                onNotify?.(item.product.name, item.product.images?.[0], 'removed');
+                onNotify?.(item.product.name, imgVariant(item.product.images?.[0] ?? '', 'sm'), 'removed');
                 removeItem(item.product.id);
               }}
               className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors flex-shrink-0"

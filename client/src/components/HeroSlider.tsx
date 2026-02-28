@@ -8,7 +8,9 @@ interface SlideData {
   description: string;
   buttonText: string;
   buttonLink: string;
-  backgroundImage: string;
+  backgroundImage: string;    // lg — 1920×1080
+  backgroundImageMd: string;  // md — 1280×720
+  backgroundImageSm: string;  // sm — 800×450
   textColor?: 'white' | 'dark';
 }
 
@@ -27,7 +29,8 @@ const HeroSlider: React.FC = () => {
   useEffect(() => {
     const fetchSlides = async () => {
       try {
-        const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
+        const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const API_BASE = `${SERVER_URL}/api`;
         const response = await fetch(`${API_BASE}/hero-slides`);
         if (response.ok) {
           const data = await response.json();
@@ -38,7 +41,9 @@ const HeroSlider: React.FC = () => {
             description: slide.description || '',
             buttonText: slide.button_text,
             buttonLink: slide.button_link,
-            backgroundImage: `${API_BASE}${slide.background_image}`,
+            backgroundImage:   `${SERVER_URL}${slide.background_image}`,
+            backgroundImageMd: `${SERVER_URL}${slide.background_image_md}`,
+            backgroundImageSm: `${SERVER_URL}${slide.background_image_sm}`,
             textColor: slide.text_color || 'white'
           }));
 
@@ -242,18 +247,22 @@ const HeroSlider: React.FC = () => {
                   <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 animate-pulse"></div>
                 )}
 
-                <img
-                  src={slide.backgroundImage}
-                  alt={slide.title}
-                  className={`w-full h-full object-cover transition-opacity duration-500 ${
-                    isImageLoaded ? 'opacity-100' : 'opacity-0'
-                  }`}
-                  onLoad={() => {
-                    setImagesLoaded(prev => new Set(prev).add(index));
-                  }}
-                  loading="eager"
-                  fetchpriority={index === 0 ? 'high' : 'auto'}
-                />
+                <picture>
+                  <source media="(max-width: 768px)"  srcSet={slide.backgroundImageSm} />
+                  <source media="(max-width: 1280px)" srcSet={slide.backgroundImageMd} />
+                  <img
+                    src={slide.backgroundImage}
+                    alt={slide.title}
+                    className={`w-full h-full object-cover transition-opacity duration-500 ${
+                      isImageLoaded ? 'opacity-100' : 'opacity-0'
+                    }`}
+                    onLoad={() => {
+                      setImagesLoaded(prev => new Set(prev).add(index));
+                    }}
+                    loading="eager"
+                    fetchpriority={index === 0 ? 'high' : 'auto'}
+                  />
+                </picture>
                 {/* Overlay */}
                 <div className="absolute inset-0 bg-black bg-opacity-40"></div>
               </div>

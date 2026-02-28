@@ -31,6 +31,20 @@ export const getImageCacheKey = (): number => {
  *   In dev, VITE_API_URL defaults to http://localhost:3001 (Vite also proxies /produtos).
  *   In production, set VITE_API_URL to the backend domain (e.g. https://arteemponto.pt).
  */
+/**
+ * Returns the URL for a specific size variant of a product image.
+ * - 'lg': original path (max 1200 px) — product detail page
+ * - 'md': medium (max 600 px)         — shop grid / modals
+ * - 'sm': small (max 280 px)          — thumbnails, cart, admin previews
+ *
+ * Falls back gracefully to the original path for images that pre-date the
+ * multi-variant system (the browser will just load the full-size file).
+ */
+export const imgVariant = (imagePath: string, variant: 'sm' | 'md' | 'lg'): string => {
+  if (!imagePath || variant === 'lg') return imagePath;
+  return imagePath.replace(/\.webp$/, `-${variant}.webp`);
+};
+
 export const getAbsoluteImageUrl = (imageUrl: string): string => {
   if (!imageUrl) return '';
 

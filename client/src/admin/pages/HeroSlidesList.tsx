@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X, MoveVertical, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 
-const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
+const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = `${SERVER_URL}/api`;
 
 interface HeroSlide {
   id: number;
@@ -11,6 +12,8 @@ interface HeroSlide {
   button_text: string;
   button_link: string;
   background_image: string;
+  background_image_md: string;
+  background_image_sm: string;
   text_color: 'white' | 'dark';
   display_order: number;
   is_active: boolean;
@@ -513,7 +516,7 @@ export default function HeroSlidesList() {
             <div className="relative h-48 overflow-hidden">
               <div
                 className="absolute inset-0 bg-cover bg-center"
-                style={{ backgroundImage: `url(${API_URL}${slide.background_image})` }}
+                style={{ backgroundImage: `url(${SERVER_URL}${slide.background_image_md || slide.background_image})` }}
               >
                 {/* Overlay */}
                 <div className="absolute inset-0 bg-black bg-opacity-40"></div>
@@ -755,7 +758,7 @@ export default function HeroSlidesList() {
                         {/* Show current image or preview */}
                         <div className="mt-3">
                           <img
-                            src={imagePreview || `${API_URL}${slide.background_image}`}
+                            src={imagePreview || `${SERVER_URL}${slide.background_image_md || slide.background_image}`}
                             alt="Preview"
                             className="w-full h-48 object-cover rounded-lg"
                           />

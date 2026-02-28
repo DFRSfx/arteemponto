@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { statsApi } from '../../utils/apiHelpers';
 import { Euro, ShoppingCart, Package, AlertTriangle, Users } from 'lucide-react';
-import { getAbsoluteImageUrl } from '../../utils/imageUtils';
+import { getAbsoluteImageUrl, imgVariant } from '../../utils/imageUtils';
 
 interface Stats {
   totalOrders: number;
@@ -200,7 +200,7 @@ export default function Dashboard() {
                   >
                     <div className="flex items-center gap-3 sm:gap-4">
                       <img
-                        src={product.images && product.images.length > 0 ? getAbsoluteImageUrl(product.images[0]) : '/placeholder.png'}
+                        src={product.images && product.images.length > 0 ? getAbsoluteImageUrl(imgVariant(product.images[0], 'sm')) : '/placeholder.png'}
                         alt={`Imagem de ${product.name}`}
                         className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded-lg flex-shrink-0 border border-gray-100"
                       />

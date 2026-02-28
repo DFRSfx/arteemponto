@@ -9,7 +9,7 @@ import { useProducts } from '../hooks/useProducts';
 import { useCategories } from '../hooks/useCategories';
 import { Product } from '../types';
 import AuthModal from './AuthModal';
-import { getAbsoluteImageUrl } from '../utils/imageUtils';
+import { getAbsoluteImageUrl, imgVariant } from '../utils/imageUtils';
 
 const Navbar: React.FC = () => {
   const { products, loading: productsLoading } = useProducts();
@@ -25,7 +25,7 @@ const Navbar: React.FC = () => {
     if (categoryProducts.length === 0) return null;
 
     const randomProduct = categoryProducts[Math.floor(Math.random() * categoryProducts.length)];
-    return randomProduct.images[0] ? getAbsoluteImageUrl(randomProduct.images[0]) : null;
+    return randomProduct.images[0] ? getAbsoluteImageUrl(imgVariant(randomProduct.images[0], 'sm')) : null;
   };
 
   // SVG Placeholder for categories without products
@@ -433,7 +433,7 @@ const Navbar: React.FC = () => {
                         className="w-full px-4 py-3 hover:bg-gray-50 flex items-center gap-3 text-left transition-colors"
                       >
                         <img
-                          src={getAbsoluteImageUrl(product.images[0])}
+                          src={getAbsoluteImageUrl(imgVariant(product.images[0], 'sm'))}
                           alt={product.name}
                           className="w-12 h-12 object-cover rounded"
                         />
@@ -538,7 +538,7 @@ const Navbar: React.FC = () => {
                           className="w-full px-4 py-3 hover:bg-gray-50 flex items-center gap-3 text-left transition-colors"
                         >
                           <img
-                            src={getAbsoluteImageUrl(product.images[0])}
+                            src={getAbsoluteImageUrl(imgVariant(product.images[0], 'sm'))}
                             alt={product.name}
                             className="w-12 h-12 object-cover rounded"
                           />

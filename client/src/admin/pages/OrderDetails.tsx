@@ -124,7 +124,7 @@ export default function OrderDetails() {
               {order.order_items.map((item) => (
                 <div key={item.id} className="flex items-center space-x-4 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
                   <img
-                    src={item.product.images && item.product.images.length > 0 ? getAbsoluteImageUrl(item.product.images[0]) : '/placeholder.png'}
+                    src={item.product.image ? getAbsoluteImageUrl(item.product.image) : '/placeholder.png'}
                     alt={item.product.name}
                     className="w-20 h-20 object-cover rounded-lg"
                   />

@@ -62,6 +62,12 @@ app.use('/produtos', (_req, res, next) => {
   next();
 }, express.static(path.join(__dirname, '../public/produtos')));
 
+// Serve hero slide images as static files
+app.use('/hero-slides', (_req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(path.join(__dirname, '../public/hero-slides')));
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
