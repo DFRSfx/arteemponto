@@ -1,20 +1,304 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
+import Stripe from 'stripe';
+import crypto from 'crypto';
+import pool from '../config/database.js';
+import emailService from '../emailService.js';
 
 const router = express.Router();
 
-// Eupago API configuration
-const EUPAGO_API_KEY = process.env.EUPAGO_API_KEY || '';
-const EUPAGO_BASE_URL = process.env.EUPAGO_BASE_URL || 'https://sandbox.eupago.pt/api/v1.02';
-const EUPAGO_OLD_BASE_URL = 'https://sandbox.eupago.pt/clientes/rest_api';
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-if (!EUPAGO_API_KEY) {
-  console.error('⚠️  EUPAGO_API_KEY not configured!');
+// Payment callback base URL — used as return_url for Multibanco / MB WAY.
+const PAYMENT_CALLBACK_URL = (
+  process.env.PAYMENT_CALLBACK_URL ||
+  process.env.FRONTEND_URL?.split(',').find(u => u.startsWith('https://')) ||
+  process.env.FRONTEND_URL?.split(',')[0] ||
+  'http://localhost:5173'
+).replace(/\/$/, '');
+
+if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_...') {
+  console.error('⚠️  STRIPE_SECRET_KEY not configured!');
 } else {
-  console.log('✅ Eupago configured with key:', EUPAGO_API_KEY.substring(0, 10) + '...');
+  console.log('✅ Stripe configured with key:', process.env.STRIPE_SECRET_KEY.substring(0, 12) + '...');
 }
 
-// Generate Multibanco reference
+// ---------------------------------------------------------------------------
+// Helper: create order from pending checkout data (used by /finalize + webhook)
+// ---------------------------------------------------------------------------
+async function createOrderFromData(
+  connection: any,
+  paymentIntentId: string,
+  data: any
+): Promise<{ orderId: number; trackingToken: string; order: any }> {
+  const {
+    customer_name, customer_email, customer_phone,
+    customer_address, customer_city, customer_postal_code,
+    payment_method, items, total, user_id, save_address
+  } = data;
+
+  const trackingToken = crypto.randomBytes(32).toString('hex');
+
+  const [orderResult]: any = await connection.query(
+    `INSERT INTO orders (
+      tracking_token, user_id, customer_name, customer_email, customer_phone,
+      customer_address, customer_city, customer_postal_code,
+      payment_method, total, status, payment_status, payment_intent_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      trackingToken, user_id || null, customer_name, customer_email, customer_phone,
+      customer_address, customer_city, customer_postal_code,
+      payment_method, total, 'pending', 'pending', paymentIntentId
+    ]
+  );
+  const orderId = orderResult.insertId;
+
+  for (const item of items) {
+    await connection.query(
+      'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)',
+      [orderId, item.product_id, item.quantity, item.price]
+    );
+    await connection.query(
+      'UPDATE products SET stock = GREATEST(0, stock - ?) WHERE id = ?',
+      [item.quantity, item.product_id]
+    );
+  }
+
+  if (user_id && save_address) {
+    const [existing]: any = await connection.query(
+      'SELECT id FROM shipping_addresses WHERE user_id = ? AND address = ? AND city = ? AND postal_code = ?',
+      [user_id, customer_address, customer_city, customer_postal_code]
+    );
+    if (existing.length === 0) {
+      const [countRows]: any = await connection.query(
+        'SELECT COUNT(*) as count FROM shipping_addresses WHERE user_id = ?',
+        [user_id]
+      );
+      await connection.query(
+        'INSERT INTO shipping_addresses (user_id, name, address, city, postal_code, phone, is_default) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [user_id, 'Morada Principal', customer_address, customer_city, customer_postal_code, customer_phone, countRows[0].count === 0 ? 1 : 0]
+      );
+    }
+  }
+
+  await connection.query(
+    'DELETE FROM pending_checkouts WHERE payment_intent_id = ?',
+    [paymentIntentId]
+  );
+
+  const [newOrder]: any = await connection.query('SELECT * FROM orders WHERE id = ?', [orderId]);
+  return { orderId, trackingToken, order: newOrder[0] };
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/payment/initialize
+// Creates a PaymentIntent and stores checkout data — NO order is created yet.
+// ---------------------------------------------------------------------------
+router.post(
+  '/initialize',
+  [
+    body('customer_name').trim().notEmpty().withMessage('Name is required'),
+    body('customer_email').isEmail().withMessage('Valid email is required'),
+    body('customer_phone').trim().notEmpty().withMessage('Phone is required'),
+    body('customer_address').trim().notEmpty().withMessage('Address is required'),
+    body('customer_city').trim().notEmpty().withMessage('City is required'),
+    body('customer_postal_code').trim().notEmpty().withMessage('Postal code is required'),
+    body('payment_method').trim().notEmpty().withMessage('Payment method is required'),
+    body('items').isArray({ min: 1 }).withMessage('Items are required'),
+    body('items.*.product_id').isInt().withMessage('Product ID must be an integer'),
+    body('items.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
+    body('items.*.price').isFloat({ min: 0 }).withMessage('Price must be positive'),
+  ],
+  async (req: any, res: any) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      const {
+        customer_name, customer_email, customer_phone,
+        customer_address, customer_city, customer_postal_code,
+        payment_method, items, user_id, save_address
+      } = req.body;
+
+      // item.price already includes IVA — no multiplication needed
+      const subtotal = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+      const total = parseFloat(subtotal.toFixed(2));
+
+      if (total <= 0) {
+        res.status(400).json({ error: 'Invalid order total' });
+        return;
+      }
+
+      const methodTypeMap: Record<string, string[]> = {
+        card: ['card'], googlepay: ['card'], applepay: ['card'],
+        mbway: ['mb_way'], multibanco: ['multibanco'],
+      };
+      const stripeTypes = methodTypeMap[payment_method] || ['card'];
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(total * 100),
+        currency: 'eur',
+        payment_method_types: stripeTypes,
+        metadata: { payment_method }
+      } as any);
+
+      await pool.execute(
+        'INSERT INTO pending_checkouts (payment_intent_id, data) VALUES (?, ?)',
+        [
+          paymentIntent.id,
+          JSON.stringify({
+            customer_name, customer_email, customer_phone,
+            customer_address, customer_city, customer_postal_code,
+            payment_method, items, total,
+            user_id: user_id || null,
+            save_address: save_address || false
+          })
+        ]
+      );
+
+      console.log(`💳 PI ${paymentIntent.id} created for ${customer_email} (${payment_method}) — ${total}€`);
+
+      res.json({
+        success: true,
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount: total
+      });
+    } catch (error: any) {
+      console.error('Error initializing payment:', error);
+      res.status(500).json({ error: error.message || 'Failed to initialize payment' });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// POST /api/payment/finalize
+// Called by frontend after payment succeeds — creates the order from pending data.
+// ---------------------------------------------------------------------------
+router.post(
+  '/finalize',
+  [body('payment_intent_id').trim().notEmpty().withMessage('Payment intent ID required')],
+  async (req: any, res: any) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      const { payment_intent_id } = req.body;
+
+      // Idempotency: return existing order if already finalized
+      const [existing]: any = await pool.query(
+        'SELECT * FROM orders WHERE payment_intent_id = ?',
+        [payment_intent_id]
+      );
+      if (existing.length > 0) {
+        res.json({ ...existing[0], tracking_url: `/track-order/${existing[0].tracking_token}` });
+        return;
+      }
+
+      const [pendingRows]: any = await pool.query(
+        'SELECT data FROM pending_checkouts WHERE payment_intent_id = ?',
+        [payment_intent_id]
+      );
+      if (pendingRows.length === 0) {
+        res.status(404).json({ error: 'Checkout session not found or already used' });
+        return;
+      }
+
+      const checkoutData = JSON.parse(pendingRows[0].data);
+      const connection = await pool.getConnection();
+
+      try {
+        await connection.beginTransaction();
+        const { orderId, trackingToken, order } = await createOrderFromData(connection, payment_intent_id, checkoutData);
+        await connection.commit();
+
+        console.log(`✅ Order ${orderId} created for PI ${payment_intent_id}`);
+
+        // If PI already succeeded (card payments), update order immediately.
+        // Email is sent exclusively by the webhook (payment_intent.succeeded)
+        // to avoid duplicates.
+        try {
+          const pi = await stripe.paymentIntents.retrieve(payment_intent_id);
+          if (pi.status === 'succeeded') {
+            await pool.execute(
+              "UPDATE orders SET status = 'processing', payment_status = 'paid' WHERE id = ?",
+              [orderId]
+            );
+          }
+        } catch (piErr: any) {
+          console.error('Warning: could not check PI status:', piErr.message);
+        }
+
+        res.status(201).json({ ...order, tracking_url: `/track-order/${trackingToken}` });
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+    } catch (error: any) {
+      console.error('Error finalizing order:', error);
+      res.status(500).json({ error: error.message || 'Failed to create order' });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// POST /api/payment/creditcard
+// POST /api/payment/googlepay
+// POST /api/payment/applepay
+// All three create a PaymentIntent and return clientSecret for Stripe Elements
+// ---------------------------------------------------------------------------
+const cardPaymentHandler = [
+  body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be positive'),
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('order_id').isInt().withMessage('Order ID is required'),
+  async (req: any, res: any) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      const { amount, order_id } = req.body;
+
+      console.log('Creating Stripe PaymentIntent for order:', order_id);
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(parseFloat(amount) * 100),
+        currency: 'eur',
+        payment_method_types: ['card'],
+        metadata: { order_id: String(order_id) }
+      });
+
+      res.json({
+        success: true,
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id
+      });
+    } catch (error: any) {
+      console.error('Stripe PaymentIntent error:', error);
+      res.status(500).json({ error: error.message || 'Failed to create payment' });
+    }
+  }
+];
+
+router.post('/creditcard', cardPaymentHandler);
+router.post('/googlepay', cardPaymentHandler);
+router.post('/applepay', cardPaymentHandler);
+
+// ---------------------------------------------------------------------------
+// POST /api/payment/multibanco
+// Creates a PaymentIntent and returns clientSecret for Stripe Elements.
+// After frontend confirmation, Stripe returns entity/reference via next_action.
+// ---------------------------------------------------------------------------
 router.post(
   '/multibanco',
   [
@@ -22,91 +306,50 @@ router.post(
     body('email').isEmail().withMessage('Valid email is required'),
     body('order_id').isInt().withMessage('Order ID is required')
   ],
-  async (req, res) => {
+  async (req: any, res: any) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        console.error('Validation errors:', errors.array());
         res.status(400).json({ errors: errors.array() });
         return;
       }
 
-      const { amount, email, order_id } = req.body;
+      const { amount, order_id } = req.body;
 
-      console.log('Generating Multibanco reference for order:', order_id);
+      console.log('Creating Multibanco PaymentIntent for order:', order_id);
 
-      const requestData = {
-        chave: EUPAGO_API_KEY,
-        valor: amount.toFixed(2),
-        id: `ORDER-${order_id}-${Date.now()}`,
-        per_dup: '0'
-      };
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(parseFloat(amount) * 100),
+        currency: 'eur',
+        payment_method_types: ['multibanco'],
+        metadata: { order_id: String(order_id) }
+      } as any);
 
-      console.log('Multibanco Request:', requestData);
-
-      const response = await fetch(`${EUPAGO_OLD_BASE_URL}/multibanco/create`, {
-        method: 'POST',
-        headers: {
-          'accept': 'application/json',
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify(requestData)
-      });
-
-      const contentType = response.headers.get('content-type');
-      console.log('Response status:', response.status);
-      console.log('Response content-type:', contentType);
-
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('Non-JSON response:', text);
-        res.status(500).json({ 
-          error: 'Invalid response from Eupago', 
-          details: text.substring(0, 200) 
-        });
-        return;
-      }
-
-      const data = await response.json();
-      console.log('Multibanco response:', data);
-
-      if (!response.ok || data.estado === 'error' || data.resposta === 'erro') {
-        console.error('Eupago error:', data);
-        res.status(500).json({ 
-          error: 'Failed to generate Multibanco reference', 
-          details: data.mensagem || data.resposta || data 
-        });
-        return;
-      }
-
-      // Response format from Eupago
       res.json({
         success: true,
-        entity: data.entidade,
-        reference: data.referencia,
-        value: parseFloat(data.valor),
-        identifier: requestData.id
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id
       });
     } catch (error: any) {
-      console.error('Error generating Multibanco reference:', error);
-      res.status(500).json({ 
-        error: 'Failed to generate payment reference',
-        message: error.message 
-      });
+      console.error('Stripe Multibanco error:', error);
+      res.status(500).json({ error: error.message || 'Erro Multibanco' });
     }
   }
 );
 
-// Generate MB WAY payment
+// ---------------------------------------------------------------------------
+// POST /api/payment/mbway
+// Creates a PaymentIntent and returns clientSecret for Stripe Elements.
+// The user enters their phone number in the Stripe MB WAY element frontend.
+// ---------------------------------------------------------------------------
 router.post(
   '/mbway',
   [
     body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be positive'),
-    body('phone').trim().notEmpty().withMessage('Phone is required'),
     body('email').isEmail().withMessage('Valid email is required'),
     body('order_id').isInt().withMessage('Order ID is required')
   ],
-  async (req, res) => {
+  async (req: any, res: any) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -114,229 +357,145 @@ router.post(
         return;
       }
 
-      const { amount, phone, email, order_id } = req.body;
+      const { amount, order_id } = req.body;
 
-      // Format phone number
-      let formattedPhone = phone.replace(/\s+/g, '');
-      if (formattedPhone.startsWith('+351')) {
-        formattedPhone = formattedPhone.substring(4);
-      } else if (formattedPhone.startsWith('351')) {
-        formattedPhone = formattedPhone.substring(3);
-      } else if (formattedPhone.startsWith('00351')) {
-        formattedPhone = formattedPhone.substring(5);
-      }
+      console.log('Creating MB WAY PaymentIntent for order:', order_id);
 
-      // Validate Portuguese mobile number
-      if (!/^9\d{8}$/.test(formattedPhone)) {
-        res.status(400).json({ error: 'Número de telemóvel inválido. Use formato: 912345678' });
-        return;
-      }
-
-      console.log('Generating MB WAY payment for order:', order_id);
-
-      const requestData = {
-        chave: EUPAGO_API_KEY,
-        valor: amount.toFixed(2),
-        id: `ORDER-${order_id}-${Date.now()}`,
-        alias: formattedPhone,
-        email: email
-      };
-
-      console.log('MB WAY Request:', requestData);
-
-      const response = await fetch(`${EUPAGO_OLD_BASE_URL}/mbway/create`, {
-        method: 'POST',
-        headers: {
-          'accept': 'application/json',
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify(requestData)
-      });
-
-      const contentType = response.headers.get('content-type');
-      console.log('Response status:', response.status);
-      console.log('Response content-type:', contentType);
-
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('Non-JSON response:', text);
-        res.status(500).json({ 
-          error: 'Invalid response from Eupago', 
-          details: text.substring(0, 200) 
-        });
-        return;
-      }
-
-      const data = await response.json();
-      console.log('MB WAY response:', data);
-
-      if (!response.ok || data.estado === 'error' || data.resposta === 'erro') {
-        console.error('Eupago MB WAY error:', data);
-        res.status(500).json({ 
-          error: 'Failed to generate MB WAY payment', 
-          details: data.mensagem || data.resposta || data 
-        });
-        return;
-      }
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(parseFloat(amount) * 100),
+        currency: 'eur',
+        payment_method_types: ['mb_way'],
+        metadata: { order_id: String(order_id) }
+      } as any);
 
       res.json({
         success: true,
-        transactionId: data.transacao || data.id,
-        status: data.estado,
-        message: 'Verifique a sua app MB WAY para autorizar o pagamento',
-        identifier: requestData.id
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id
       });
     } catch (error: any) {
-      console.error('Error generating MB WAY payment:', error);
-      res.status(500).json({ 
-        error: 'Failed to generate MB WAY payment',
-        message: error.message 
-      });
+      console.error('Stripe MB WAY error:', error);
+      res.status(500).json({ error: error.message || 'Erro MB WAY' });
     }
   }
 );
 
-// Generate Credit/Debit Card payment
-router.post(
-  '/creditcard',
-  [
-    body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be positive'),
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('order_id').isInt().withMessage('Order ID is required')
-  ],
-  async (req, res) => {
+// ---------------------------------------------------------------------------
+// POST /api/payment/webhook
+// Stripe webhook — raw body required (set in index.ts before express.json())
+// ---------------------------------------------------------------------------
+router.post('/webhook', async (req: any, res: any) => {
+  const sig = req.headers['stripe-signature'] as string;
+
+  if (!sig) {
+    res.status(400).json({ error: 'Missing stripe-signature header' });
+    return;
+  }
+
+  let event: Stripe.Event;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (webhookSecret && webhookSecret !== 'whsec_...') {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        console.error('Validation errors:', errors.array());
-        res.status(400).json({ errors: errors.array() });
-        return;
-      }
-
-      const { amount, email, order_id } = req.body;
-
-      console.log('Generating Credit Card payment form for order:', order_id);
-
-      const identifier = `ORDER-${order_id}-${Date.now()}`;
-
-      // Get the frontend URL for success/fail/back URLs
-      const frontendUrl = process.env.FRONTEND_URL?.split(',')[0] || 'http://localhost:5173';
-
-      const requestData = {
-        payment: {
-          amount: {
-            currency: 'EUR',
-            value: parseFloat(amount.toFixed(2))
-          },
-          lang: 'PT',
-          minutesFormUp: 1440, // 24 hours
-          identifier: identifier,
-          successUrl: `${frontendUrl}/checkout/success?order=${order_id}`,
-          failUrl: `${frontendUrl}/checkout/fail?order=${order_id}`,
-          backUrl: `${frontendUrl}/checkout`
-        },
-        customer: {
-          notify: true,
-          email: email
-        }
-      };
-
-      console.log('Credit Card Request:', JSON.stringify(requestData, null, 2));
-
-      const response = await fetch(`${EUPAGO_BASE_URL}/creditcard/create`, {
-        method: 'POST',
-        headers: {
-          'accept': 'application/json',
-          'content-type': 'application/json',
-          'Authorization': `ApiKey ${EUPAGO_API_KEY}`
-        },
-        body: JSON.stringify(requestData)
-      });
-
-      const contentType = response.headers.get('content-type');
-      console.log('Response status:', response.status);
-      console.log('Response content-type:', contentType);
-
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('Non-JSON response:', text);
-        res.status(500).json({
-          error: 'Invalid response from Eupago',
-          details: text.substring(0, 200)
-        });
-        return;
-      }
-
-      const data = await response.json();
-      console.log('Credit Card response:', JSON.stringify(data, null, 2));
-
-      if (!response.ok || data.status === 'error') {
-        console.error('Eupago error:', data);
-        res.status(500).json({
-          error: 'Failed to generate Credit Card payment',
-          details: data.message || data.error || data
-        });
-        return;
-      }
-
-      // Response format from Eupago
-      // The API returns a URL where the customer should be redirected to complete the payment
-      res.json({
-        success: true,
-        paymentUrl: data.url || data.payment_url || data.redirectUrl,
-        transactionId: data.transactionID || data.id,
-        identifier: identifier,
-        message: 'Redirecione o cliente para completar o pagamento'
-      });
-    } catch (error: any) {
-      console.error('Error generating Credit Card payment:', error);
-      res.status(500).json({
-        error: 'Failed to generate Credit Card payment',
-        message: error.message
-      });
-    }
-  }
-);
-
-// Webhook to receive payment notifications from Eupago
-router.post('/webhook', async (req, res) => {
-  try {
-    console.log('Eupago webhook received:', req.body);
-
-    const {
-      identificador,
-      estado,
-      valor,
-      canal,
-      referencia,
-      transactionID,
-      mp_token
-    } = req.body;
-
-    // TODO: Validate webhook authenticity using mp_token
-
-    // Extract order ID from identificador
-    const orderIdMatch = identificador?.match(/ORDER-(\d+)-/) || identificador?.match(/ORDER-(\d+)$/);
-    if (!orderIdMatch) {
-      console.error('Invalid identifier format:', identificador);
-      res.status(400).json({ error: 'Invalid identifier' });
+      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    } catch (err: any) {
+      console.error('Stripe webhook signature verification failed:', err.message);
+      res.status(400).json({ error: `Webhook error: ${err.message}` });
       return;
     }
+  } else {
+    // No webhook secret configured — parse body without verification (dev only)
+    console.warn('⚠️  STRIPE_WEBHOOK_SECRET not set — skipping signature verification');
+    try {
+      event = JSON.parse(req.body.toString()) as Stripe.Event;
+    } catch {
+      res.status(400).json({ error: 'Invalid JSON body' });
+      return;
+    }
+  }
 
-    const orderId = parseInt(orderIdMatch[1]);
+  console.log('Stripe webhook received:', event.type);
 
-    // Update order status based on payment status
-    if (estado === 'ok' || estado === 'success' || estado === 'paid') {
-      console.log(`✅ Payment confirmed for order ${orderId}`);
-      // TODO: Update order status in database
-    } else if (estado === 'error' || estado === 'failed') {
-      console.log(`❌ Payment failed for order ${orderId}`);
-      // TODO: Update order status in database
+  try {
+    if (event.type === 'payment_intent.succeeded') {
+      const pi = event.data.object as Stripe.PaymentIntent;
+
+      // Find order: new flow uses payment_intent_id column; legacy uses metadata
+      let orderId: number | null = null;
+      const [byPI]: any = await pool.query(
+        'SELECT id FROM orders WHERE payment_intent_id = ?', [pi.id]
+      );
+      if (byPI.length > 0) {
+        orderId = byPI[0].id;
+      } else if (pi.metadata?.order_id && !isNaN(parseInt(pi.metadata.order_id))) {
+        orderId = parseInt(pi.metadata.order_id);
+      }
+
+      if (orderId) {
+        const [updateResult]: any = await pool.execute(
+          "UPDATE orders SET status = 'processing', payment_status = 'paid' WHERE id = ? AND status = 'pending'",
+          [orderId]
+        );
+        if (updateResult.affectedRows > 0) {
+          console.log(`✅ Order ${orderId} → processing`);
+          // Send confirmation email (only if we actually changed the status)
+          const [orderRows]: any = await pool.query(
+            'SELECT customer_name, customer_email, total FROM orders WHERE id = ?', [orderId]
+          );
+          const [itemRows]: any = await pool.query(
+            `SELECT oi.quantity, oi.price, p.name
+             FROM order_items oi JOIN products p ON oi.product_id = p.id
+             WHERE oi.order_id = ?`, [orderId]
+          );
+          if (orderRows.length > 0) {
+            emailService.sendOrderConfirmation(
+              orderRows[0].customer_email,
+              orderRows[0].customer_name,
+              String(orderId),
+              {
+                total: parseFloat(orderRows[0].total),
+                items: itemRows.map((r: any) => ({
+                  name: r.name, quantity: r.quantity, price: parseFloat(r.price)
+                }))
+              }
+            ).catch((err: any) => console.error('❌ Webhook email error:', err.message));
+          }
+        } else {
+          console.log(`ℹ️  Order ${orderId} already processed (webhook duplicate)`);
+        }
+      } else {
+        console.log(`⚠️  No order found for PI ${pi.id}`);
+      }
+
+    } else if (event.type === 'payment_intent.payment_failed') {
+      const pi = event.data.object as Stripe.PaymentIntent;
+
+      let orderId: number | null = null;
+      const [byPI]: any = await pool.query(
+        'SELECT id FROM orders WHERE payment_intent_id = ?', [pi.id]
+      );
+      if (byPI.length > 0) {
+        orderId = byPI[0].id;
+      } else if (pi.metadata?.order_id && !isNaN(parseInt(pi.metadata.order_id))) {
+        orderId = parseInt(pi.metadata.order_id);
+      }
+
+      if (orderId) {
+        await pool.execute(
+          "UPDATE orders SET status = 'cancelled' WHERE id = ? AND status = 'pending'",
+          [orderId]
+        );
+        console.log(`❌ Order ${orderId} → cancelled`);
+      }
+      // Clean up pending checkout if not yet finalized
+      await pool.execute(
+        'DELETE FROM pending_checkouts WHERE payment_intent_id = ?', [pi.id]
+      ).catch(() => {});
     }
 
-    res.json({ success: true, message: 'Webhook processed' });
+    res.json({ received: true });
   } catch (error) {
-    console.error('Error processing webhook:', error);
+    console.error('Error processing webhook event:', error);
     res.status(500).json({ error: 'Failed to process webhook' });
   }
 });

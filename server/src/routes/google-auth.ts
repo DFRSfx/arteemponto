@@ -56,7 +56,7 @@ router.post('/google', async (req, res) => {
 
     // Check if user exists
     const [existingUsers]: any = await pool.query(
-      'SELECT id, email, name, role, status, email_verified, google_id FROM users WHERE email = ?',
+      'SELECT id, email, name, role, status, email_verified, google_id, avatar_url FROM users WHERE email = ?',
       [email]
     );
 
@@ -64,6 +64,7 @@ router.post('/google', async (req, res) => {
     let userRole: string;
     let userName: string;
     let isEmailVerified: boolean;
+    let userAvatarUrl: string | null;
 
     if (existingUsers.length > 0) {
       // User exists - update Google ID if not set
@@ -72,6 +73,7 @@ router.post('/google', async (req, res) => {
       userRole = user.role;
       userName = user.name;
       isEmailVerified = user.email_verified;
+      userAvatarUrl = user.avatar_url || picture || null;
 
       // Check if account is suspended
       if (user.status === 'suspended' || user.status === 'inactive') {
@@ -107,11 +109,12 @@ router.post('/google', async (req, res) => {
         userRole = 'customer';
         userName = name || 'User';
         isEmailVerified = true;
+        userAvatarUrl = picture || null;
       } catch (insertError: any) {
         // If duplicate entry (race condition), try to fetch the user again
         if (insertError.code === 'ER_DUP_ENTRY') {
           const [retryUsers]: any = await pool.query(
-            'SELECT id, email, name, role, status, email_verified, google_id FROM users WHERE email = ?',
+            'SELECT id, email, name, role, status, email_verified, google_id, avatar_url FROM users WHERE email = ?',
             [email]
           );
 
@@ -121,6 +124,7 @@ router.post('/google', async (req, res) => {
             userRole = user.role;
             userName = user.name;
             isEmailVerified = user.email_verified;
+            userAvatarUrl = user.avatar_url || picture || null;
           } else {
             throw insertError;
           }
@@ -151,7 +155,9 @@ router.post('/google', async (req, res) => {
         email,
         name: userName,
         role: userRole,
-        emailVerified: isEmailVerified
+        emailVerified: isEmailVerified,
+        hasPassword: false,
+        avatarUrl: userAvatarUrl
       }
     });
   } catch (error) {
@@ -223,7 +229,7 @@ router.post('/callback', async (req, res) => {
 
     // Check if user exists
     const [existingUsers]: any = await pool.query(
-      'SELECT id, email, name, role, status, email_verified, google_id FROM users WHERE email = ?',
+      'SELECT id, email, name, role, status, email_verified, google_id, avatar_url FROM users WHERE email = ?',
       [email]
     );
 
@@ -231,6 +237,7 @@ router.post('/callback', async (req, res) => {
     let userRole: string;
     let userName: string;
     let isEmailVerified: boolean;
+    let userAvatarUrl: string | null;
 
     if (existingUsers.length > 0) {
       // User exists - update Google ID if not set
@@ -239,6 +246,7 @@ router.post('/callback', async (req, res) => {
       userRole = user.role;
       userName = user.name;
       isEmailVerified = user.email_verified;
+      userAvatarUrl = user.avatar_url || picture || null;
 
       // Check if account is suspended
       if (user.status === 'suspended' || user.status === 'inactive') {
@@ -274,11 +282,12 @@ router.post('/callback', async (req, res) => {
         userRole = 'customer';
         userName = name || 'User';
         isEmailVerified = true;
+        userAvatarUrl = picture || null;
       } catch (insertError: any) {
         // If duplicate entry (race condition), try to fetch the user again
         if (insertError.code === 'ER_DUP_ENTRY') {
           const [retryUsers]: any = await pool.query(
-            'SELECT id, email, name, role, status, email_verified, google_id FROM users WHERE email = ?',
+            'SELECT id, email, name, role, status, email_verified, google_id, avatar_url FROM users WHERE email = ?',
             [email]
           );
 
@@ -288,6 +297,7 @@ router.post('/callback', async (req, res) => {
             userRole = user.role;
             userName = user.name;
             isEmailVerified = user.email_verified;
+            userAvatarUrl = user.avatar_url || picture || null;
           } else {
             throw insertError;
           }
@@ -318,7 +328,9 @@ router.post('/callback', async (req, res) => {
         email,
         name: userName,
         role: userRole,
-        emailVerified: isEmailVerified
+        emailVerified: isEmailVerified,
+        hasPassword: false,
+        avatarUrl: userAvatarUrl
       }
     });
   } catch (error) {

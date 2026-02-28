@@ -99,7 +99,7 @@ router.post(
 
       // Find user
       const [rows]: any = await pool.query(
-        'SELECT id, email, password, name, role, status, email_verified FROM users WHERE email = ?',
+        'SELECT id, email, password, name, role, status, email_verified, avatar_url FROM users WHERE email = ?',
         [email]
       );
 
@@ -156,7 +156,9 @@ router.post(
           email: user.email,
           name: user.name,
           role: user.role,
-          emailVerified: user.email_verified
+          emailVerified: user.email_verified,
+          hasPassword: true,
+          avatarUrl: user.avatar_url || null
         }
       });
     } catch (error) {
@@ -175,7 +177,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
     }
 
     const [rows]: any = await pool.query(
-      'SELECT id, email, name, role, created_at FROM users WHERE id = ?',
+      'SELECT id, email, name, role, created_at, avatar_url, (password IS NOT NULL AND password != \'\') as has_password FROM users WHERE id = ?',
       [req.user.id]
     );
 
@@ -184,7 +186,8 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
       return;
     }
 
-    res.json(rows[0]);
+    const { has_password, avatar_url, ...rest } = rows[0];
+    res.json({ ...rest, hasPassword: !!has_password, avatarUrl: avatar_url || null });
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ error: 'Erro ao obter utilizador' });

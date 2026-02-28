@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import authRouter from './routes/auth.js';
 import googleAuthRouter from './routes/google-auth.js';
 import productsRouter from './routes/products.js';
@@ -16,6 +18,9 @@ import favoritesRouter from './routes/favorites.js';
 import shippingAddressesRouter from './routes/shipping-addresses.js';
 import paymentRouter from './routes/payment.js';
 import { errorHandler } from './middleware/errorHandler.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables from .env file
 dotenv.config();
@@ -43,8 +48,19 @@ app.use(cors({
   credentials: true
 }));
 
+// Raw body parser for Stripe webhook (must be before express.json())
+app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve product images as static files
+// Cross-Origin-Resource-Policy must be 'cross-origin' so the browser (on a
+// different origin in dev, or same origin in prod via nginx) can load the images.
+app.use('/produtos', (_req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(path.join(__dirname, '../public/produtos')));
 
 // Health check
 app.get('/health', (req, res) => {

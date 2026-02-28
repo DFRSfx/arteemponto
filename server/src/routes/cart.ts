@@ -33,24 +33,21 @@ router.get('/', async (req: AuthRequest, res) => {
         p.price,
         p.stock,
         p.category_id,
-        GROUP_CONCAT(pi.id ORDER BY pi.display_order) as image_ids
+        p.images
       FROM cart_items ci
       JOIN products p ON ci.product_id = p.id
-      LEFT JOIN product_images pi ON p.id = pi.product_id
       WHERE ${userId ? 'ci.user_id = ?' : 'ci.session_id = ?'}
-      GROUP BY ci.id, ci.product_id, ci.quantity, p.name, p.price, p.stock, p.category_id
       ORDER BY ci.created_at DESC
     `;
 
     const [items] = await pool.query(query, [userId || sessionId]);
 
-    // Convert image_ids to array of image URLs and ensure price is a number
     const formattedItems = (items as any[]).map(item => ({
       ...item,
       price: parseFloat(item.price),
-      images: item.image_ids ?
-        item.image_ids.split(',').map((id: string) => `/products/image/${id}?v=${Date.now()}`) :
-        []
+      images: item.images
+        ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images)
+        : []
     }));
 
     res.json({ items: formattedItems });

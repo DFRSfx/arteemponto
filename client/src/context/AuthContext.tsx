@@ -6,6 +6,8 @@ interface User {
   name: string;
   role: 'customer' | 'admin';
   emailVerified?: boolean;
+  hasPassword?: boolean;
+  avatarUrl?: string | null;
 }
 
 interface AuthContextType {
@@ -19,6 +21,7 @@ interface AuthContextType {
   isEmailVerified: boolean;
   updateUser: (updatedUser: User) => void;
   refreshUser: () => Promise<void>;
+  setAuthState: (token: string, user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -133,6 +136,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const setAuthState = (token: string, user: User) => {
+    localStorage.setItem('auth_token', token);
+    localStorage.setItem('auth_user', JSON.stringify(user));
+    setToken(token);
+    setUser(user);
+  };
+
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
     localStorage.setItem('auth_user', JSON.stringify(updatedUser));
@@ -156,6 +166,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: data.name,
           role: data.role,
           emailVerified: data.email_verified || false,
+          hasPassword: data.hasPassword ?? user?.hasPassword,
+          avatarUrl: data.avatarUrl ?? user?.avatarUrl,
         };
         setUser(updatedUser);
         localStorage.setItem('auth_user', JSON.stringify(updatedUser));
@@ -176,6 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logout,
     updateUser,
     refreshUser,
+    setAuthState,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

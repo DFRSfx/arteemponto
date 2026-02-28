@@ -53,7 +53,11 @@ export default function OrderDetails() {
   };
 
   const updateStatus = async (newStatus: string) => {
-    if (!confirm(`Are you sure you want to change the status to "${newStatus}"?`)) return;
+    const statusLabels: Record<string, string> = {
+      pending: 'Pendente', processing: 'Em processamento',
+      shipped: 'Enviado', delivered: 'Entregue', cancelled: 'Cancelado'
+    };
+    if (!confirm(`Tem a certeza que pretende alterar o estado para "${statusLabels[newStatus] ?? newStatus}"?`)) return;
 
     setUpdating(true);
     try {
@@ -87,7 +91,7 @@ export default function OrderDetails() {
   if (!order) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Order not found</p>
+        <p className="text-gray-500">Encomenda não encontrada</p>
       </div>
     );
   }
@@ -104,7 +108,7 @@ export default function OrderDetails() {
         >
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-3xl font-bold text-gray-800">Order #{order.id}</h1>
+        <h1 className="text-3xl font-bold text-gray-800">Encomenda #{order.id}</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -114,7 +118,7 @@ export default function OrderDetails() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
               <Package className="mr-2" size={20} />
-              Order Items
+              Artigos
             </h2>
             <div className="space-y-4">
               {order.order_items.map((item) => (
@@ -126,11 +130,11 @@ export default function OrderDetails() {
                   />
                   <div className="flex-1">
                     <p className="font-medium text-gray-800">{item.product.name}</p>
-                    <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                    <p className="text-sm text-gray-600">Quantidade: {item.quantity}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-gray-800">€{(Number(item.price) * item.quantity).toFixed(2)}</p>
-                    <p className="text-sm text-gray-600">€{Number(item.price).toFixed(2)} each</p>
+                    <p className="text-sm text-gray-600">€{Number(item.price).toFixed(2)} cada</p>
                   </div>
                 </div>
               ))}
@@ -147,11 +151,11 @@ export default function OrderDetails() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
               <User className="mr-2" size={20} />
-              Customer Information
+              Informações do Cliente
             </h2>
             <div className="space-y-3">
               <div>
-                <p className="text-sm text-gray-600">Name</p>
+                <p className="text-sm text-gray-600">Nome</p>
                 <p className="font-medium text-gray-800">{order.customer_name}</p>
               </div>
               <div>
@@ -159,7 +163,7 @@ export default function OrderDetails() {
                 <p className="font-medium text-gray-800">{order.customer_email}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Phone</p>
+                <p className="text-sm text-gray-600">Telefone</p>
                 <p className="font-medium text-gray-800">{order.customer_phone}</p>
               </div>
             </div>
@@ -169,7 +173,7 @@ export default function OrderDetails() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
               <MapPin className="mr-2" size={20} />
-              Shipping Address
+              Morada de Entrega
             </h2>
             <div className="space-y-1">
               <p className="text-gray-800">{order.customer_address}</p>
@@ -183,18 +187,22 @@ export default function OrderDetails() {
         <div className="space-y-6">
           {/* Status */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Order Status</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Estado da Encomenda</h2>
             <select
               value={order.status}
               onChange={(e) => updateStatus(e.target.value)}
               disabled={updating}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none disabled:opacity-50"
             >
-              {statusOptions.map(status => (
-                <option key={status} value={status}>
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </option>
-              ))}
+              {statusOptions.map(status => {
+                const labels: Record<string, string> = {
+                  pending: 'Pendente', processing: 'Em processamento',
+                  shipped: 'Enviado', delivered: 'Entregue', cancelled: 'Cancelado'
+                };
+                return (
+                  <option key={status} value={status}>{labels[status] ?? status}</option>
+                );
+              })}
             </select>
           </div>
 
@@ -202,7 +210,7 @@ export default function OrderDetails() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
               <CreditCard className="mr-2" size={20} />
-              Payment
+              Pagamento
             </h2>
             <p className="text-gray-800">{order.payment_method}</p>
           </div>
@@ -211,7 +219,7 @@ export default function OrderDetails() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
               <Calendar className="mr-2" size={20} />
-              Order Date
+              Data da Encomenda
             </h2>
             <p className="text-gray-800">{formatDate(order.created_at)}</p>
           </div>

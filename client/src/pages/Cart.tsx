@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ShoppingBag, ArrowRight, Trash2, ShieldCheck, RefreshCw, AlertTriangle } from 'lucide-react';
 import SEO from '../components/SEO';
 import CartItem from '../components/CartItem';
+import CartToast from '../components/CartToast';
 import { useCart } from '../context/CartContext';
 
 const Cart: React.FC = () => {
@@ -10,10 +11,11 @@ const Cart: React.FC = () => {
   
   // Estado para controlar o modal de confirmação
   const [showClearModal, setShowClearModal] = useState(false);
+  const [cartToast, setCartToast] = useState<{ name: string; image?: string; type: 'added' | 'removed' | 'updated' } | null>(null);
 
   const shipping = 0;
-  const taxAmount = total * 0.23;
-  const finalTotal = total + taxAmount;
+  const subtotalExVat = total / 1.23;
+  const ivaAmount = total - subtotalExVat;
 
   const handleConfirmClear = () => {
     clearCart();
@@ -95,9 +97,10 @@ const Cart: React.FC = () => {
               {/* Isto cria um scroll interno se a lista for muito longa */}
               <div className={`divide-y divide-gray-100 ${items.length > 3 ? 'max-h-[600px] overflow-y-auto custom-scrollbar' : ''}`}>
                 {items.map((item) => (
-                  <CartItem 
-                    key={`${item.product.id}-${item.selectedColor || 'default'}`} 
-                    item={item} 
+                  <CartItem
+                    key={`${item.product.id}-${item.selectedColor || 'default'}`}
+                    item={item}
+                    onNotify={(name, image, type) => setCartToast({ name, image, type })}
                   />
                 ))}
               </div>
@@ -121,8 +124,8 @@ const Cart: React.FC = () => {
               
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between text-gray-600 text-sm sm:text-base">
-                  <span>Subtotal</span>
-                  <span className="font-medium">{total.toFixed(2)}€</span>
+                  <span>Subtotal (s/ IVA)</span>
+                  <span className="font-medium">{subtotalExVat.toFixed(2)}€</span>
                 </div>
                 <div className="flex justify-between text-gray-600 text-sm sm:text-base">
                   <span>Envio</span>
@@ -130,18 +133,18 @@ const Cart: React.FC = () => {
                 </div>
                 <div className="flex justify-between text-gray-600 text-sm sm:text-base">
                   <span>IVA (23%)</span>
-                  <span className="font-medium">{taxAmount.toFixed(2)}€</span>
+                  <span className="font-medium">{ivaAmount.toFixed(2)}€</span>
                 </div>
-                
+
                 <div className="border-t border-dashed border-gray-200 pt-4 mt-4">
                   <div className="flex justify-between items-end">
-                    <span className="text-lg font-semibold text-gray-900">Total</span>
+                    <span className="text-lg font-semibold text-gray-900">Total (c/ IVA)</span>
                     <span className="text-2xl font-bold text-primary-600">
-                      {finalTotal.toFixed(2)}€
+                      {total.toFixed(2)}€
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 text-right mt-1">
-                    Taxas incluídas
+                    IVA incluído
                   </p>
                 </div>
               </div>
@@ -185,6 +188,16 @@ const Cart: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Cart Notification */}
+      {cartToast && (
+        <CartToast
+          productName={cartToast.name}
+          productImage={cartToast.image}
+          type={cartToast.type}
+          onClose={() => setCartToast(null)}
+        />
+      )}
 
       {/* Modal de Confirmação de Limpeza */}
       {showClearModal && (

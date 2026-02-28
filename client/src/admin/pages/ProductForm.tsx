@@ -32,7 +32,7 @@ export default function ProductForm() {
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [existingImages, setExistingImages] = useState<number[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -66,14 +66,9 @@ export default function ProductForm() {
           colors: data.colors ? (Array.isArray(data.colors) ? data.colors : JSON.parse(data.colors)) : []
         });
         
-        // Load existing images from API - they come as image IDs
+        // Load existing images from API - they come as file paths
         if (data.images && Array.isArray(data.images)) {
-          const imageIds = data.images.map((img: string) => {
-            const match = img.match(/\/image\/(\d+)/);
-            return match ? parseInt(match[1]) : null;
-          }).filter((id: number | null) => id !== null);
-          
-          setExistingImages(imageIds);
+          setExistingImages(data.images);
           setImagePreviews(data.images);
         }
       }
@@ -142,16 +137,24 @@ export default function ProductForm() {
       });
     } else {
       // Mixed - need to reorganize both arrays
-      const allItems = [
-        ...existingImages.map((id, i) => ({ type: 'existing' as const, id, preview: imagePreviews[i] })),
+      type AllItem =
+        | { type: 'existing'; path: string; preview: string }
+        | { type: 'new'; file: File; preview: string };
+
+      const allItems: AllItem[] = [
+        ...existingImages.map((path, i) => ({ type: 'existing' as const, path, preview: imagePreviews[i] })),
         ...selectedFiles.map((file, i) => ({ type: 'new' as const, file, preview: imagePreviews[existingImages.length + i] }))
       ];
 
       const [movedItem] = allItems.splice(fromIndex, 1);
       allItems.splice(toIndex, 0, movedItem);
 
-      const newExisting = allItems.filter(item => item.type === 'existing').map(item => item.id);
-      const newFiles = allItems.filter(item => item.type === 'new').map(item => item.file!);
+      const newExisting = allItems
+        .filter((item): item is { type: 'existing'; path: string; preview: string } => item.type === 'existing')
+        .map(item => item.path);
+      const newFiles = allItems
+        .filter((item): item is { type: 'new'; file: File; preview: string } => item.type === 'new')
+        .map(item => item.file);
       const newPreviews = allItems.map(item => item.preview);
 
       setExistingImages(newExisting);

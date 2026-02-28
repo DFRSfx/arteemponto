@@ -1,5 +1,5 @@
 import React from 'react';
-import { Instagram, Mail, Phone, MapPin } from 'lucide-react';
+import { Instagram, Mail, Phone } from 'lucide-react';
 
 const Footer: React.FC = () => {
   return (
@@ -23,7 +23,7 @@ const Footer: React.FC = () => {
                 <Instagram className="h-5 w-5" />
               </a>
               <a
-                href="mailto:info@arteemponto.pt"
+                href="mailto:arteemponto1972@gmail.com"
                 className="p-2 bg-primary-700 rounded-full hover:bg-primary-600 transition-colors"
               >
                 <Mail className="h-5 w-5" />
@@ -64,11 +64,11 @@ const Footer: React.FC = () => {
             <ul className="space-y-2 text-primary-200">
               <li className="flex items-center">
                 <Phone className="h-4 w-4 mr-2" />
-                <span>+351 912 345 678</span>
+                <span>+351 919 626 697</span>
               </li>
               <li className="flex items-center">
                 <Mail className="h-4 w-4 mr-2" />
-                <span>info@arteemponto.pt</span>
+                <span>arteemponto1972@gmail.com</span>
               </li>
             </ul>
           </div>

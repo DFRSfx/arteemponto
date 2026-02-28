@@ -6,13 +6,15 @@ import { getAbsoluteImageUrl } from '../utils/imageUtils';
 
 interface CartItemProps {
   item: CartItemType;
+  onNotify?: (name: string, image?: string, type: 'added' | 'removed' | 'updated') => void;
 }
 
-const CartItem: React.FC<CartItemProps> = ({ item }) => {
+const CartItem: React.FC<CartItemProps> = ({ item, onNotify }) => {
   const { updateQuantity, removeItem } = useCart();
 
   const handleQuantityChange = (newQuantity: number) => {
     if (newQuantity <= 0) {
+      onNotify?.(item.product.name, item.product.images?.[0], 'removed');
       removeItem(item.product.id);
     } else {
       updateQuantity(item.product.id, newQuantity);
@@ -47,7 +49,10 @@ const CartItem: React.FC<CartItemProps> = ({ item }) => {
             </div>
             
             <button
-              onClick={() => removeItem(item.product.id)}
+              onClick={() => {
+                onNotify?.(item.product.name, item.product.images?.[0], 'removed');
+                removeItem(item.product.id);
+              }}
               className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors flex-shrink-0"
               title="Remover produto"
             >

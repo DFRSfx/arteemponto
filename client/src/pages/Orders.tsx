@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { Package, Truck, CheckCircle, XCircle, Clock, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { Package, Truck, CheckCircle, XCircle, Clock, ChevronDown, ChevronUp, Eye, FileText } from 'lucide-react';
 import { getAbsoluteImageUrl } from '../utils/imageUtils';
+import InvoiceModal from '../components/InvoiceModal';
+import { InvoiceOrder } from '../utils/generateInvoice';
 import SEO from '../components/SEO';
 
 interface OrderItem {
@@ -24,6 +26,9 @@ interface Order {
   payment_status: 'pending' | 'paid' | 'failed' | 'expired';
   payment_method: string;
   created_at: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
   customer_address: string;
   customer_city: string;
   customer_postal_code: string;
@@ -34,6 +39,7 @@ const Orders: React.FC = () => {
   const { isAuthenticated, token } = useAuth();
   const navigate = useNavigate();
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
+  const [invoiceOrder, setInvoiceOrder] = useState<InvoiceOrder | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -205,41 +211,63 @@ const Orders: React.FC = () => {
                   {/* Order Header */}
                   <div
                     onClick={() => toggleOrder(order.id)}
-                    className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+                    onKeyDown={(e) => {
+                      // Allow keyboard users to trigger the toggle with Enter or Space
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleOrder(order.id);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-expanded={isExpanded}
+                    className="p-6 cursor-pointer hover:bg-gray-50 transition-colors focus:outline-none focus:bg-gray-100 focus:ring-2 focus:ring-inset focus:ring-primary-500"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-6 flex-1">
-                        <div>
-                          <p className="text-sm text-gray-500">Encomenda</p>
-                          <p className="font-semibold text-gray-900">#{order.id}</p>
+                    <div className="flex items-start justify-between gap-4">
+                      
+                      {/* Left Side: Order Info & Badges */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 flex-1">
+                        
+                        {/* Text Data (Grid ensures they align nicely on tiny screens) */}
+                        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                          <div>
+                            <p className="text-sm text-gray-500">Encomenda</p>
+                            <p className="font-semibold text-gray-900">#{order.id}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Data</p>
+                            <p className="font-medium text-gray-900">
+                              {new Date(order.created_at).toLocaleDateString('pt-PT')}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Total</p>
+                            <p className="font-semibold text-gray-900">{Number(order.total).toFixed(2)}€</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Data</p>
-                          <p className="font-medium text-gray-900">
-                            {new Date(order.created_at).toLocaleDateString('pt-PT')}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Total</p>
-                          <p className="font-semibold text-gray-900">{parseFloat(order.total).toFixed(2)}€</p>
-                        </div>
-                        <div className="flex items-center gap-2">
+
+                        {/* Status Badges (Now wrap properly on mobile) */}
+                        <div className="flex flex-wrap items-center gap-2 mt-1 sm:mt-0">
                           <span
                             className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${statusConfig.bgColor} ${statusConfig.color}`}
                           >
-                            <StatusIcon className="h-4 w-4" />
-                            {statusConfig.label}
+                            <StatusIcon className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{statusConfig.label}</span>
                           </span>
                           {getPaymentStatusBadge(order.payment_status)}
                         </div>
+                        
                       </div>
-                      <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+
+                      {/* Right Side: Chevron Icon */}
+                      <div className="p-1 mt-1 sm:mt-0">
                         {isExpanded ? (
-                          <ChevronUp className="h-5 w-5 text-gray-600" />
+                          <ChevronUp className="h-5 w-5 text-gray-600 shrink-0" />
                         ) : (
-                          <ChevronDown className="h-5 w-5 text-gray-600" />
+                          <ChevronDown className="h-5 w-5 text-gray-600 shrink-0" />
                         )}
-                      </button>
+                      </div>
+                      
                     </div>
                   </div>
 
@@ -299,19 +327,30 @@ const Orders: React.FC = () => {
                             <div className="bg-white p-4 rounded-lg">
                               <p className="text-sm text-gray-500 mb-1">Total</p>
                               <p className="text-lg font-bold text-primary-600">
-                                {parseFloat(order.total).toFixed(2)}€
+                                {Number(order.total).toFixed(2)}€
                               </p>
                             </div>
                           </div>
 
                           {/* Actions */}
-                          <Link
-                            to={`/track-order/${order.tracking_token}`}
-                            className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                          >
-                            <Eye className="h-4 w-4" />
-                            Ver Detalhes
-                          </Link>
+                          <div className="mt-4 space-y-2">
+                            <Link
+                              to={`/track-order/${order.tracking_token}`}
+                              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                            >
+                              <Eye className="h-4 w-4" />
+                              Ver Detalhes
+                            </Link>
+                            {order.payment_status === 'paid' && (
+                              <button
+                                onClick={() => setInvoiceOrder(order)}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-primary-600 text-primary-700 rounded-lg hover:bg-primary-50 transition-colors font-medium"
+                              >
+                                <FileText className="h-4 w-4" />
+                                Ver Fatura
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -322,6 +361,13 @@ const Orders: React.FC = () => {
           </div>
         )}
       </div>
+
+      {invoiceOrder && (
+        <InvoiceModal
+          order={invoiceOrder}
+          onClose={() => setInvoiceOrder(null)}
+        />
+      )}
     </div>
   );
 };

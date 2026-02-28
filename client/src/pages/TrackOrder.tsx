@@ -337,18 +337,18 @@ const TrackOrder: React.FC = () => {
                   <div className="flex-1">
                     <p className="font-medium">{item.product.name}</p>
                     <p className="text-sm text-gray-600">
-                      Quantidade: {item.quantity} × {item.price.toFixed(2)}€
+                      Quantidade: {item.quantity} × {parseFloat(String(item.price)).toFixed(2)}€
                     </p>
                   </div>
                   <span className="font-medium">
-                    {(item.quantity * item.price).toFixed(2)}€
+                    {(item.quantity * parseFloat(String(item.price))).toFixed(2)}€
                   </span>
                 </div>
               ))}
               <div className="border-t pt-4">
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span className="text-primary-600">{parseFloat(order.total).toFixed(2)}€</span>
+                  <span className="text-primary-600">{parseFloat(String(order.total)).toFixed(2)}€</span>
                 </div>
               </div>
             </div>
@@ -364,10 +364,10 @@ const TrackOrder: React.FC = () => {
             Se tiver alguma dúvida sobre a sua encomenda, entre em contacto connosco.
           </p>
           <a
-            href="mailto:suporte@arteemponto.pt"
+            href="mailto:arteemponto1972@gmail.com"
             className="text-sm text-primary-600 hover:text-primary-700 font-medium"
           >
-            suporte@arteemponto.pt
+            arteemponto1972@gmail.com
           </a>
         </div>
       </div>

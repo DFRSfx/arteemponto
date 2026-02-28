@@ -1,36 +1,36 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle } from 'lucide-react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { CheckCircle, LogIn, X } from 'lucide-react';
 import SEO from '../components/SEO';
+import { useAuth } from '../context/AuthContext';
+import AuthModal from '../components/AuthModal';
 
 const CheckoutSuccess: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const orderId = searchParams.get('order');
-  const [orderDetails, setOrderDetails] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const token = searchParams.get('token');
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
+  const [orderId, setOrderId] = useState<number | null>(null);
+  const [showGuestModal, setShowGuestModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Validate the token and fetch the order number
   useEffect(() => {
-    const fetchOrderDetails = async () => {
-      if (!orderId) {
-        setLoading(false);
-        return;
-      }
+    if (!token) return;
+    fetch(`/api/orders/track/${token}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data?.id) setOrderId(data.id); })
+      .catch(() => {});
+  }, [token]);
 
-      try {
-        const response = await fetch(`/api/orders/${orderId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setOrderDetails(data);
-        }
-      } catch (error) {
-        console.error('Error fetching order details:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrderDetails();
-  }, [orderId]);
+  const handleVerEncomendas = () => {
+    if (isAuthenticated) {
+      navigate('/encomendas');
+    } else {
+      setShowGuestModal(true);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -47,7 +47,7 @@ const CheckoutSuccess: React.FC = () => {
           </div>
 
           <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            Pagamento Concluído com Sucesso! 🎉
+            Pagamento Concluído com Sucesso!
           </h1>
 
           <p className="text-gray-600 mb-8">
@@ -62,9 +62,9 @@ const CheckoutSuccess: React.FC = () => {
           )}
 
           <div className="text-sm text-gray-600 mb-8">
-            <p>✅ Pagamento confirmado</p>
-            <p>📧 Receberá um email de confirmação em breve</p>
-            <p>📦 A sua encomenda será processada nas próximas horas</p>
+            <p>Pagamento confirmado</p>
+            <p>Receberá um email de confirmação em breve</p>
+            <p>A sua encomenda será processada nas próximas horas</p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4">
@@ -74,15 +74,56 @@ const CheckoutSuccess: React.FC = () => {
             >
               Voltar ao Início
             </Link>
-            <Link
-              to="/encomendas"
+            <button
+              onClick={handleVerEncomendas}
               className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-md hover:bg-gray-50 transition-colors"
             >
               Ver Encomendas
-            </Link>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Guest modal — shown when unauthenticated user clicks "Ver Encomendas" */}
+      {showGuestModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="font-semibold text-gray-900">Ver Encomendas</h2>
+              <button
+                onClick={() => setShowGuestModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-gray-600 text-sm mb-5">
+                Para ver o histórico das suas encomendas precisa de ter uma conta e estar autenticado.
+              </p>
+              <button
+                onClick={() => { setShowGuestModal(false); setShowAuthModal(true); }}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                  <LogIn className="h-4 w-4" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-sm">Entrar / Criar Conta</p>
+                  <p className="text-xs text-white/75">Aceda ao histórico completo de encomendas</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Auth modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialMode="login"
+      />
     </div>
   );
 };

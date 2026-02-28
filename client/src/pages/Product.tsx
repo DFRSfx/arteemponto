@@ -10,10 +10,11 @@ import ProductCard from '../components/ProductCard';
 import { getProductSchema, getBreadcrumbSchema } from '../utils/schemas';
 import { getAbsoluteImageUrl } from '../utils/imageUtils';
 import Toast, { ToastType } from '../components/Toast';
+import CartToast from '../components/CartToast';
 
 const Product: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { addItem } = useCart();
+  const { addItem, items, updateQuantity, removeItem } = useCart();
   const { favorites, addToFavorites, removeFromFavorites } = useFavorites();
   const { product, loading, error } = useProduct(id || '');
   const { products: allProducts } = useProducts();
@@ -27,6 +28,7 @@ const Product: React.FC = () => {
   const [dragOffset, setDragOffset] = useState(0);
   const [relatedViewMode, setRelatedViewMode] = useState<'grid' | 'fullscreen'>('grid');
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const [cartToast, setCartToast] = useState<{ name: string; image?: string; type: 'added' | 'removed' | 'updated' } | null>(null);
   const imageRef = useRef<HTMLDivElement>(null);
 
   // Navigation functions for image slider (without loop)
@@ -206,9 +208,12 @@ const Product: React.FC = () => {
     for (let i = 0; i < quantity; i++) {
       addItem(product, selectedColor);
     }
+    setCartToast({ name: product.name, image: product.images[0], type: 'added' });
   };
 
   const isFavorite = product ? favorites.some(fav => fav.product_id === String(product.id)) : false;
+  const cartItem = items.find(i => String(i.product.id) === String(product.id));
+  const isInCart = !!cartItem;
 
   const handleToggleFavorite = async () => {
     if (!product) return;
@@ -478,64 +483,142 @@ const Product: React.FC = () => {
                 </div>
               )}
 
-              {/* Quantity */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3">Quantidade:</h3>
-                <div className="flex items-center border border-gray-300 rounded-md w-fit">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="p-3 hover:bg-gray-50 transition-colors"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <span className="px-6 py-3 border-l border-r border-gray-300 font-medium">
-                    {quantity}
-                  </span>
-                  <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="p-3 hover:bg-gray-50 transition-colors"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
+              {/* Quantity - only when not in cart */}
+              {!isInCart && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Quantidade:</h3>
+                  <div className="flex items-center border border-gray-300 rounded-md w-fit">
+                    <button
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      className="p-3 hover:bg-gray-50 transition-colors"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="px-6 py-3 border-l border-r border-gray-300 font-medium">
+                      {quantity}
+                    </span>
+                    <button
+                      onClick={() => setQuantity(quantity + 1)}
+                      className="p-3 hover:bg-gray-50 transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-
+              )}
               {/* Actions */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button
-                  onClick={handleAddToCart}
-                  disabled={!product.inStock}
-                  className="flex-1 flex items-center justify-center gap-2 bg-primary-600 text-white py-3 px-4 sm:px-6 rounded-md hover:bg-primary-700 hover:shadow-lg hover:scale-105 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none transition-all duration-300 text-base sm:text-lg font-semibold group whitespace-nowrap"
-                >
-                  <ShoppingBag className="h-5 w-5 flex-shrink-0 group-hover:scale-110 transition-transform duration-300" />
-                  <span className="whitespace-nowrap">{product.inStock ? 'Adicionar ao Carrinho' : 'Esgotado'}</span>
-                </button>
+              <div className="flex flex-col lg:flex-row gap-3 pt-2">
+                {isInCart ? (
+                  /* --- O Botão Unificado Sleek (Design Fiel à Imagem) --- */
+                  <div className="flex-1 flex items-stretch border border-primary-700 rounded-lg overflow-hidden shadow-sm h-12 bg-white">
+                    
+                    {/* Grupo da Esquerda (Fundo Branco) */}
+                    <div className="flex items-stretch bg-white">
+                      {/* Botão Diminuir */}
+                      <button
+                        onClick={() => {
+                          const newQty = (cartItem!.quantity) - 1;
+                          if (newQty <= 0) {
+                            removeItem(cartItem!.product.id);
+                            setCartToast({ name: product.name, image: product.images[0], type: 'removed' });
+                          } else {
+                            updateQuantity(cartItem!.product.id, newQty);
+                            setCartToast({ name: product.name, image: product.images[0], type: 'updated' });
+                          }
+                        }}
+                        className="w-12 sm:w-[52px] flex items-center justify-center text-primary-700 hover:bg-primary-50 active:bg-primary-100 transition-colors focus:outline-none"
+                        aria-label="Diminuir quantidade no carrinho"
+                      >
+                        <Minus className="h-4 w-4" strokeWidth={2.5} />
+                      </button>
 
-                <div className="flex gap-4">
+                      {/* Linha Divisória */}
+                      <div className="w-px bg-primary-700"></div>
+
+                      {/* Quantidade Atual */}
+                      <div className="w-12 sm:w-[52px] flex items-center justify-center text-primary-800 font-bold text-lg">
+                        {cartItem!.quantity}
+                      </div>
+
+                      {/* Linha Divisória */}
+                      <div className="w-px bg-primary-700"></div>
+
+                      {/* Botão Aumentar */}
+                      <button
+                        onClick={() => {
+                          updateQuantity(cartItem!.product.id, cartItem!.quantity + 1);
+                          setCartToast({ name: product.name, image: product.images[0], type: 'updated' });
+                        }}
+                        className="w-12 sm:w-[52px] flex items-center justify-center text-primary-700 hover:bg-primary-50 active:bg-primary-100 transition-colors focus:outline-none"
+                        aria-label="Aumentar quantidade no carrinho"
+                      >
+                        <Plus className="h-4 w-4" strokeWidth={2.5} />
+                      </button>
+                    </div>
+
+                    {/* Botão Ver Carrinho (Lado Direito Castanho) */}
+                    <Link
+                      to="/carrinho"
+                      className="flex-1 flex items-center justify-center gap-2 bg-primary-700 text-white hover:bg-primary-800 transition-colors font-semibold text-sm sm:text-[15px] focus:outline-none"
+                    >
+                      <ShoppingBag className="h-[18px] w-[18px]" strokeWidth={2} />
+                      <span className="whitespace-nowrap">Ver Carrinho</span>
+                    </Link>
+                    
+                  </div>
+                ) : (
+                  /* Botão Original: Adicionar ao Carrinho */
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={!product.inStock}
+                    className="flex-1 flex items-center justify-center gap-2.5 bg-primary-700 text-white h-12 px-6 rounded-lg hover:bg-primary-800 shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed disabled:hover:shadow-none transition-all duration-200 text-[15px] font-medium group focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                  >
+                    <ShoppingBag className="h-[18px] w-[18px] flex-shrink-0 group-hover:scale-110 transition-transform duration-300" />
+                    <span className="whitespace-nowrap">{product.inStock ? 'Adicionar ao Carrinho' : 'Esgotado'}</span>
+                  </button>
+                )}
+
+                {/* Secundários: Favoritar / Partilhar (Animação Slide Right-to-Left Corrigida) */}
+                <div className="flex gap-3">
                   <button 
                     onClick={handleToggleFavorite}
-                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 border rounded-md hover:scale-105 transition-all duration-300 ${
+                    aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                    className={`group flex flex-row lg:flex-row-reverse items-center justify-center h-12 flex-1 lg:flex-none border rounded-lg transition-all duration-300 overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
                       isFavorite
-                        ? 'border-primary-600 bg-primary-50 text-primary-600 hover:bg-primary-100'
-                        : 'border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                        ? 'border-primary-600 bg-primary-50 text-primary-600'
+                        : 'border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50'
                     }`}
                   >
-                    <Heart className={`h-5 w-5 flex-shrink-0 ${isFavorite ? 'fill-current' : ''}`} />
-                    <span className="whitespace-nowrap text-sm font-medium">
-                      {isFavorite ? 'Remover' : 'Favoritar'}
-                    </span>
+                    {/* Ícone fixo */}
+                    <div className="w-12 h-12 flex items-center justify-center flex-shrink-0">
+                      <Heart className={`h-[18px] w-[18px] transition-transform duration-300 ${isFavorite ? 'fill-current scale-110' : 'group-hover:scale-110'}`} />
+                    </div>
+                    {/* Texto com padding ajustado (pl-5) para afastar da borda */}
+                    <div className="max-w-[150px] lg:max-w-0 overflow-hidden opacity-100 lg:opacity-0 group-hover:max-w-[150px] group-hover:opacity-100 transition-all duration-300 ease-in-out flex items-center">
+                      <span className="whitespace-nowrap text-sm font-medium pl-1 lg:pl-5 pr-3 lg:pr-1">
+                        {isFavorite ? 'Guardado' : 'Favoritar'}
+                      </span>
+                    </div>
                   </button>
 
                   <button
                     onClick={handleShare}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 hover:border-gray-400 hover:scale-105 transition-all duration-300"
+                    aria-label="Partilhar produto"
+                    className="group flex flex-row lg:flex-row-reverse items-center justify-center h-12 flex-1 lg:flex-none border border-gray-300 text-gray-700 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all duration-300 overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
                   >
-                    <Share2 className="h-5 w-5 flex-shrink-0" />
-                    <span className="whitespace-nowrap text-sm font-medium">Partilhar</span>
+                    {/* Ícone fixo */}
+                    <div className="w-12 h-12 flex items-center justify-center flex-shrink-0">
+                      <Share2 className="h-[18px] w-[18px] transition-transform duration-300 group-hover:scale-110" />
+                    </div>
+                    {/* Texto com padding ajustado (pl-5) para afastar da borda */}
+                    <div className="max-w-[150px] lg:max-w-0 overflow-hidden opacity-100 lg:opacity-0 group-hover:max-w-[150px] group-hover:opacity-100 transition-all duration-300 ease-in-out flex items-center">
+                      <span className="whitespace-nowrap text-sm font-medium pl-1 lg:pl-5 pr-3 lg:pr-1">
+                        Partilhar
+                      </span>
+                    </div>
                   </button>
                 </div>
               </div>
-
               {/* Additional Info */}
               <div className="border-t pt-6 space-y-4">
                 <div>
@@ -613,6 +696,16 @@ const Product: React.FC = () => {
           message={toast.message}
           type={toast.type}
           onClose={() => setToast(null)}
+        />
+      )}
+
+      {/* Cart Notification */}
+      {cartToast && (
+        <CartToast
+          productName={cartToast.name}
+          productImage={cartToast.image}
+          type={cartToast.type}
+          onClose={() => setCartToast(null)}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -151,36 +151,15 @@ const emailTranslations: EmailTranslations = {
 };
 
 class EmailService {
-  private transporter: nodemailer.Transporter;
+  private resend: Resend;
+  private from: string;
 
   constructor() {
-    const emailConfig = {
-      host: process.env.EMAIL_HOST,
-      port: parseInt(process.env.EMAIL_PORT || '587'),
-      secure: process.env.EMAIL_SECURE === 'true',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    };
-
-    console.log('🔧 Email configuration:', {
-      host: emailConfig.host,
-      port: emailConfig.port,
-      secure: emailConfig.secure,
-      user: emailConfig.auth.user
-    });
-
-    this.transporter = nodemailer.createTransport(emailConfig);
-
-    this.transporter.verify()
-      .then(() => {
-        console.log('✅ Email server ready and verified');
-      })
-      .catch((error) => {
-        console.error('❌ Email configuration error:', error.message);
-        console.warn('⚠️ Email server may not be available, but the application will continue');
-      });
+    this.resend = new Resend(process.env.RESEND_API_KEY);
+    const name = process.env.EMAIL_FROM_NAME || 'Arte em Ponto';
+    const address = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+    this.from = `${name} <${address}>`;
+    console.log('✅ Resend email service initialized — from:', this.from);
   }
 
   async sendPasswordResetEmail(email: string, resetToken: string, userName: string, language = 'pt') {
@@ -188,19 +167,18 @@ class EmailService {
     const t = emailTranslations[language] || emailTranslations.pt;
     const content = t.resetPassword;
 
-    const mailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'Arte em Ponto'}" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: content.subject,
-      html: this.getResetPasswordHTML(resetUrl, userName, content),
-      text: this.getResetPasswordText(resetUrl, userName, content)
-    };
-
     try {
-      console.log('📧 Sending email to:', email);
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Reset email sent successfully!', info.messageId);
-      return { success: true, messageId: info.messageId };
+      console.log('📧 Sending reset email to:', email);
+      const { data, error } = await this.resend.emails.send({
+        from: this.from,
+        to: email,
+        subject: content.subject,
+        html: this.getResetPasswordHTML(resetUrl, userName, content),
+        text: this.getResetPasswordText(resetUrl, userName, content)
+      });
+      if (error) throw new Error(error.message);
+      console.log('✅ Reset email sent successfully!', data?.id);
+      return { success: true, messageId: data?.id };
     } catch (error: any) {
       console.error('❌ Error sending reset email:', error);
       throw new Error(`Could not send email: ${error.message}`);
@@ -211,18 +189,17 @@ class EmailService {
     const t = emailTranslations[language] || emailTranslations.pt;
     const content = t.passwordChanged;
 
-    const mailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'Arte em Ponto'}" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: content.subject,
-      html: this.getPasswordChangedHTML(userName, content),
-      text: this.getPasswordChangedText(userName, content)
-    };
-
     try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Password changed notification sent:', info.messageId);
-      return { success: true, messageId: info.messageId };
+      const { data, error } = await this.resend.emails.send({
+        from: this.from,
+        to: email,
+        subject: content.subject,
+        html: this.getPasswordChangedHTML(userName, content),
+        text: this.getPasswordChangedText(userName, content)
+      });
+      if (error) throw new Error(error.message);
+      console.log('✅ Password changed notification sent:', data?.id);
+      return { success: true, messageId: data?.id };
     } catch (error: any) {
       console.error('❌ Error sending notification:', error.message);
       return { success: false, error: error.message };
@@ -239,20 +216,23 @@ class EmailService {
     const t = emailTranslations[language] || emailTranslations.pt;
     const content = t.orderConfirmation;
 
-    const mailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'Arte em Ponto'}" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: content.subject.replace('{orderNumber}', orderNumber),
-      html: this.getOrderConfirmationHTML(userName, orderNumber, orderDetails, content),
-      text: this.getOrderConfirmationText(userName, orderNumber, orderDetails, content)
-    };
+    const sanitizedEmail = email.trim().toLowerCase();
+    const subject = content.subject.replace('{orderNumber}', orderNumber);
+    console.log(`📧 Order confirmation → to: "${sanitizedEmail}" | from: "${this.from}" | subject: "${subject}"`);
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Order confirmation sent:', info.messageId);
-      return { success: true, messageId: info.messageId };
+      const { data, error } = await this.resend.emails.send({
+        from: this.from,
+        to: sanitizedEmail,
+        subject,
+        html: this.getOrderConfirmationHTML(userName, orderNumber, orderDetails, content),
+        text: this.getOrderConfirmationText(userName, orderNumber, orderDetails, content)
+      });
+      if (error) throw new Error(error.message);
+      console.log(`✅ Order confirmation sent to "${sanitizedEmail}":`, data?.id);
+      return { success: true, messageId: data?.id };
     } catch (error: any) {
-      console.error('❌ Error sending order confirmation:', error.message);
+      console.error(`❌ Error sending order confirmation to "${sanitizedEmail}":`, error.message);
       return { success: false, error: error.message };
     }
   }
@@ -262,25 +242,24 @@ class EmailService {
     const t = emailTranslations[language] || emailTranslations.pt;
     const content = t.emailVerification;
 
-    const mailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'Arte em Ponto'}" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: content.subject,
-      html: this.getEmailVerificationHTML(verificationUrl, userName, content),
-      text: this.getEmailVerificationText(verificationUrl, userName, content)
-    };
-
     try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Verification email sent:', info.messageId);
-      return { success: true, messageId: info.messageId };
+      const { data, error } = await this.resend.emails.send({
+        from: this.from,
+        to: email,
+        subject: content.subject,
+        html: this.getEmailVerificationHTML(verificationUrl, userName, content),
+        text: this.getEmailVerificationText(verificationUrl, userName, content)
+      });
+      if (error) throw new Error(error.message);
+      console.log('✅ Verification email sent:', data?.id);
+      return { success: true, messageId: data?.id };
     } catch (error: any) {
       console.error('❌ Error sending verification email:', error.message);
       throw new Error(`Could not send email: ${error.message}`);
     }
   }
 
-  private getResetPasswordHTML(resetUrl: string, userName: string, content: any): string {
+private getResetPasswordHTML(resetUrl: string, userName: string, content: any): string {
     return `
 <!DOCTYPE html>
 <html lang="pt">
@@ -289,23 +268,23 @@ class EmailService {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${content.title}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 50%, #f5f5f5 100%); min-height: 100vh;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #fdfbf9 0%, #ffffff 50%, #fdfbf9 100%); min-height: 100vh;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0; padding: 40px 20px;">
     <tr>
       <td align="center">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1); overflow: hidden;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 20px; box-shadow: 0 10px 40px rgba(134, 75, 36, 0.08); overflow: hidden;">
           <tr>
             <td style="padding: 48px 40px 32px; text-align: center;">
-              <div style="display: inline-block; width: 80px; height: 80px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-radius: 20px; box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3); margin-bottom: 24px; line-height: 80px;">
+              <div style="display: inline-block; width: 80px; height: 80px; background: linear-gradient(135deg, #864b24 0%, #6b3a1a 100%); border-radius: 20px; box-shadow: 0 8px 20px rgba(134, 75, 36, 0.25); margin-bottom: 24px; line-height: 80px;">
                 <span style="font-size: 40px;">🔐</span>
               </div>
-              <h1 style="margin: 0 0 12px; font-size: 28px; font-weight: 700; color: #1a1a1a;">${content.title}</h1>
+              <h1 style="margin: 0 0 12px; font-size: 28px; font-weight: 700; color: #2d1a11;">${content.title}</h1>
               <p style="margin: 0; font-size: 15px; color: #8c8c8c;">${content.subtitle}</p>
             </td>
           </tr>
           <tr>
             <td style="padding: 0 40px 40px;">
-              <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #404040;">
+              <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #4a3328;">
                 ${content.greeting}${userName ? ` <strong>${userName}</strong>` : ''},
               </p>
               <p style="margin: 0 0 32px; font-size: 15px; line-height: 1.7; color: #5f6368;">
@@ -314,13 +293,13 @@ class EmailService {
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td align="center" style="padding: 0 0 32px;">
-                    <a href="${resetUrl}" style="display: inline-block; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 16px 48px; border-radius: 12px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);">
+                    <a href="${resetUrl}" style="display: inline-block; background: linear-gradient(135deg, #864b24 0%, #6b3a1a 100%); color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 16px 48px; border-radius: 12px; box-shadow: 0 4px 12px rgba(134, 75, 36, 0.2);">
                       ${content.buttonText}
                     </a>
                   </td>
                 </tr>
               </table>
-              <div style="background: #f8f9fa; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+              <div style="background: #faf7f5; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
                 <p style="margin: 0 0 8px; font-size: 13px; color: #5f6368;">
                   <strong>⏱️ ${content.validFor} ${content.minutes}</strong>
                 </p>
@@ -328,16 +307,16 @@ class EmailService {
                   ${resetUrl}
                 </p>
               </div>
-              <div style="background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-                <p style="margin: 0; font-size: 13px; color: #92400e;">
+              <div style="background: #fff8f3; border-left: 4px solid #864b24; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                <p style="margin: 0; font-size: 13px; color: #6b3a1a;">
                   🔒 ${content.securityTip}
                 </p>
               </div>
             </td>
           </tr>
           <tr>
-            <td style="padding: 24px 40px; border-top: 1px solid #e8eaed; text-align: center; background: #f8f9fa;">
-              <p style="margin: 0; font-size: 12px; color: #b3b3b3;">
+            <td style="padding: 24px 40px; border-top: 1px solid #f0e9e4; text-align: center; background: #faf7f5;">
+              <p style="margin: 0; font-size: 12px; color: #a3958e;">
                 ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
               </p>
             </td>
@@ -369,7 +348,7 @@ ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
     `;
   }
 
-  private getPasswordChangedHTML(userName: string, content: any): string {
+private getPasswordChangedHTML(userName: string, content: any): string {
     return `
 <!DOCTYPE html>
 <html lang="pt">
@@ -378,34 +357,34 @@ ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${content.title}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 50%, #f5f5f5 100%); min-height: 100vh;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #fdfbf9 0%, #ffffff 50%, #fdfbf9 100%); min-height: 100vh;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0; padding: 40px 20px;">
     <tr>
       <td align="center">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1); overflow: hidden;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 20px; box-shadow: 0 10px 40px rgba(134, 75, 36, 0.08); overflow: hidden;">
           <tr>
             <td style="padding: 48px 40px 32px; text-align: center;">
-              <div style="display: inline-block; width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 20px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3); margin-bottom: 24px; line-height: 80px;">
-                <span style="font-size: 40px;">✓</span>
+              <div style="display: inline-block; width: 80px; height: 80px; background: linear-gradient(135deg, #864b24 0%, #6b3a1a 100%); border-radius: 20px; box-shadow: 0 8px 20px rgba(134, 75, 36, 0.25); margin-bottom: 24px; line-height: 80px;">
+                <span style="font-size: 40px; color: #ffffff;">✓</span>
               </div>
-              <h1 style="margin: 0 0 12px; font-size: 28px; font-weight: 700; color: #1a1a1a;">${content.title}</h1>
+              <h1 style="margin: 0 0 12px; font-size: 28px; font-weight: 700; color: #2d1a11;">${content.title}</h1>
               <p style="margin: 0; font-size: 15px; color: #8c8c8c;">${content.subtitle}</p>
             </td>
           </tr>
           <tr>
             <td style="padding: 0 40px 40px;">
-              <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #404040;">
+              <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #4a3328;">
                 ${content.greeting}${userName ? ` <strong>${userName}</strong>` : ''},
               </p>
               <p style="margin: 0 0 32px; font-size: 15px; line-height: 1.7; color: #5f6368;">
                 ${content.message} <strong>${content.shopName}</strong> foi alterada com sucesso.
               </p>
-              <div style="background: #fef2f2; border-left: 4px solid #ef4444; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-                <p style="margin: 0; font-size: 13px; color: #991b1b;">
+              <div style="background: #fff8f3; border-left: 4px solid #864b24; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                <p style="margin: 0; font-size: 13px; color: #6b3a1a;">
                   ⚠️ ${content.notYou}
                 </p>
               </div>
-              <div style="background: #f8f9fa; border-radius: 12px; padding: 20px; text-align: center;">
+              <div style="background: #faf7f5; border-radius: 12px; padding: 20px; text-align: center;">
                 <p style="margin: 0; font-size: 13px; color: #5f6368;">
                   ${content.contactSupport}
                 </p>
@@ -413,8 +392,8 @@ ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
             </td>
           </tr>
           <tr>
-            <td style="padding: 24px 40px; border-top: 1px solid #e8eaed; text-align: center; background: #f8f9fa;">
-              <p style="margin: 0; font-size: 12px; color: #b3b3b3;">
+            <td style="padding: 24px 40px; border-top: 1px solid #f0e9e4; text-align: center; background: #faf7f5;">
+              <p style="margin: 0; font-size: 12px; color: #a3958e;">
                 ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
               </p>
             </td>
@@ -444,14 +423,17 @@ ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
     `;
   }
 
-  private getOrderConfirmationHTML(userName: string, orderNumber: string, orderDetails: any, content: any): string {
-    const itemsHTML = orderDetails.items.map((item: any) => `
+private getOrderConfirmationHTML(userName: string, orderNumber: string, orderDetails: any, content: any): string {
+    const itemsHTML = orderDetails.items.map((item: any) => {
+      const price = parseFloat(String(item.price));
+      const lineTotal = (price * item.quantity).toFixed(2);
+      return `
       <tr>
-        <td style="padding: 12px; border-bottom: 1px solid #e8eaed;">${item.name}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e8eaed; text-align: center;">${item.quantity}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e8eaed; text-align: right;">${item.price.toFixed(2)}€</td>
-      </tr>
-    `).join('');
+        <td style="padding: 12px 8px; border-bottom: 1px solid #f0e9e4;">${item.name}</td>
+        <td style="padding: 12px 8px; border-bottom: 1px solid #f0e9e4; text-align: center;">${item.quantity}</td>
+        <td style="padding: 12px 8px; border-bottom: 1px solid #f0e9e4; text-align: right; font-weight: 500;">${price.toFixed(2)}€</td>
+      </tr>`;
+    }).join('');
 
     return `
 <!DOCTYPE html>
@@ -461,53 +443,62 @@ ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${content.title}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 50%, #f5f5f5 100%); min-height: 100vh;">
-  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0; padding: 40px 20px;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #fcfaf8; min-height: 100vh;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0; padding: 30px 10px;">
     <tr>
       <td align="center">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1); overflow: hidden;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(134, 75, 36, 0.06); overflow: hidden;">
           <tr>
-            <td style="padding: 48px 40px 32px; text-align: center;">
-              <div style="display: inline-block; width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 20px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3); margin-bottom: 24px; line-height: 80px;">
-                <span style="font-size: 40px;">🎉</span>
-              </div>
-              <h1 style="margin: 0 0 12px; font-size: 28px; font-weight: 700; color: #1a1a1a;">${content.title}</h1>
+            <td style="padding: 40px 30px 24px; text-align: center;">
+              
+              <img src="images/logo-mail.png" alt="${content.shopName}" width="100" style="display: block; margin: 0 auto 24px auto; max-width: 120px; height: auto;" />
+              
+              <h1 style="margin: 0 0 8px; font-size: 26px; font-weight: 700; color: #2d1a11;">${content.title}</h1>
               <p style="margin: 0; font-size: 15px; color: #8c8c8c;">${content.subtitle}</p>
             </td>
           </tr>
           <tr>
-            <td style="padding: 0 40px 40px;">
-              <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #404040;">
+            <td style="padding: 0 30px 40px;">
+              <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #4a3328;">
                 ${content.greeting}${userName ? ` <strong>${userName}</strong>` : ''},
               </p>
-              <div style="background: #f8f9fa; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                <p style="margin: 0 0 8px; font-size: 14px; color: #5f6368;">
-                  <strong>${content.orderNumber}:</strong> #${orderNumber}
-                </p>
-                <p style="margin: 0; font-size: 14px; color: #5f6368;">
-                  <strong>${content.total}:</strong> ${orderDetails.total.toFixed(2)}€
-                </p>
+              
+              <div style="background: #faf7f5; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                  <tr>
+                    <td style="padding-bottom: 8px; font-size: 14px; color: #6b3a1a;">
+                      <strong>${content.orderNumber}:</strong> <span style="color: #4a3328;">#${orderNumber}</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="font-size: 14px; color: #6b3a1a;">
+                      <strong>${content.total}:</strong> <span style="color: #4a3328;">${parseFloat(String(orderDetails.total)).toFixed(2)}€</span>
+                    </td>
+                  </tr>
+                </table>
               </div>
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 24px;">
+
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 32px; border-collapse: collapse;">
                 <thead>
-                  <tr style="background: #f8f9fa;">
-                    <th style="padding: 12px; text-align: left; font-size: 13px; color: #5f6368;">Artigo</th>
-                    <th style="padding: 12px; text-align: center; font-size: 13px; color: #5f6368;">Qtd</th>
-                    <th style="padding: 12px; text-align: right; font-size: 13px; color: #5f6368;">Preço</th>
+                  <tr>
+                    <th style="padding: 12px 8px; text-align: left; font-size: 13px; color: #8c8c8c; border-bottom: 2px solid #f0e9e4; font-weight: 600;">Artigo</th>
+                    <th style="padding: 12px 8px; text-align: center; font-size: 13px; color: #8c8c8c; border-bottom: 2px solid #f0e9e4; font-weight: 600;">Qtd</th>
+                    <th style="padding: 12px 8px; text-align: right; font-size: 13px; color: #8c8c8c; border-bottom: 2px solid #f0e9e4; font-weight: 600;">Preço</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody style="color: #4a3328; font-size: 14px;">
                   ${itemsHTML}
                 </tbody>
               </table>
-              <p style="margin: 0; font-size: 15px; text-align: center; color: #5f6368;">
+
+              <p style="margin: 0; font-size: 15px; text-align: center; color: #6b3a1a; font-weight: 500;">
                 ${content.thankYou}
               </p>
             </td>
           </tr>
           <tr>
-            <td style="padding: 24px 40px; border-top: 1px solid #e8eaed; text-align: center; background: #f8f9fa;">
-              <p style="margin: 0; font-size: 12px; color: #b3b3b3;">
+            <td style="padding: 24px 30px; border-top: 1px solid #f0e9e4; text-align: center; background: #faf7f5;">
+              <p style="margin: 0; font-size: 12px; color: #a3958e;">
                 ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
               </p>
             </td>
@@ -522,8 +513,8 @@ ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
   }
 
   private getOrderConfirmationText(userName: string, orderNumber: string, orderDetails: any, content: any): string {
-    const itemsText = orderDetails.items.map((item: any) => 
-      `${item.name} x${item.quantity} - ${item.price.toFixed(2)}€`
+    const itemsText = orderDetails.items.map((item: any) =>
+      `${item.name} x${item.quantity} - ${parseFloat(String(item.price)).toFixed(2)}€`
     ).join('\n');
 
     return `
@@ -532,7 +523,7 @@ ${content.title}
 ${content.greeting}${userName ? ` ${userName}` : ''},
 
 ${content.orderNumber}: #${orderNumber}
-${content.total}: ${orderDetails.total.toFixed(2)}€
+${content.total}: ${parseFloat(String(orderDetails.total)).toFixed(2)}€
 
 ${content.items}:
 ${itemsText}
@@ -543,7 +534,7 @@ ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
     `;
   }
 
-  private getEmailVerificationHTML(verificationUrl: string, userName: string, content: any): string {
+private getEmailVerificationHTML(verificationUrl: string, userName: string, content: any): string {
     return `
 <!DOCTYPE html>
 <html lang="pt">
@@ -552,23 +543,23 @@ ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${content.title}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 50%, #f5f5f5 100%); min-height: 100vh;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #fdfbf9 0%, #ffffff 50%, #fdfbf9 100%); min-height: 100vh;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0; padding: 40px 20px;">
     <tr>
       <td align="center">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1); overflow: hidden;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 20px; box-shadow: 0 10px 40px rgba(134, 75, 36, 0.08); overflow: hidden;">
           <tr>
             <td style="padding: 48px 40px 32px; text-align: center;">
-              <div style="display: inline-block; width: 80px; height: 80px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 20px; box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3); margin-bottom: 24px; line-height: 80px;">
+              <div style="display: inline-block; width: 80px; height: 80px; background: linear-gradient(135deg, #864b24 0%, #6b3a1a 100%); border-radius: 20px; box-shadow: 0 8px 20px rgba(134, 75, 36, 0.25); margin-bottom: 24px; line-height: 80px;">
                 <span style="font-size: 40px;">📧</span>
               </div>
-              <h1 style="margin: 0 0 12px; font-size: 28px; font-weight: 700; color: #1a1a1a;">${content.title}</h1>
+              <h1 style="margin: 0 0 12px; font-size: 28px; font-weight: 700; color: #2d1a11;">${content.title}</h1>
               <p style="margin: 0; font-size: 15px; color: #8c8c8c;">${content.subtitle}</p>
             </td>
           </tr>
           <tr>
             <td style="padding: 0 40px 40px;">
-              <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #404040;">
+              <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #4a3328;">
                 ${content.greeting}${userName ? ` <strong>${userName}</strong>` : ''},
               </p>
               <p style="margin: 0 0 32px; font-size: 15px; line-height: 1.7; color: #5f6368;">
@@ -577,13 +568,13 @@ ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td align="center" style="padding: 0 0 32px;">
-                    <a href="${verificationUrl}" style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 16px 48px; border-radius: 12px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
+                    <a href="${verificationUrl}" style="display: inline-block; background: linear-gradient(135deg, #864b24 0%, #6b3a1a 100%); color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 16px 48px; border-radius: 12px; box-shadow: 0 4px 12px rgba(134, 75, 36, 0.2);">
                       ${content.buttonText}
                     </a>
                   </td>
                 </tr>
               </table>
-              <div style="background: #f8f9fa; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+              <div style="background: #faf7f5; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
                 <p style="margin: 0 0 8px; font-size: 13px; color: #5f6368;">
                   <strong>⏱️ ${content.validFor}</strong>
                 </p>
@@ -594,8 +585,8 @@ ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
             </td>
           </tr>
           <tr>
-            <td style="padding: 24px 40px; border-top: 1px solid #e8eaed; text-align: center; background: #f8f9fa;">
-              <p style="margin: 0; font-size: 12px; color: #b3b3b3;">
+            <td style="padding: 24px 40px; border-top: 1px solid #f0e9e4; text-align: center; background: #faf7f5;">
+              <p style="margin: 0; font-size: 12px; color: #a3958e;">
                 ${content.copyright.replace('{year}', new Date().getFullYear().toString())}
               </p>
             </td>

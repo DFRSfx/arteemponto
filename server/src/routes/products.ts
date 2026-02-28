@@ -1,33 +1,63 @@
 import express from 'express';
-import { body, validationResult } from 'express-validator';
 import pool from '../config/database.js';
 import { requireAdmin, AuthRequest } from '../middleware/auth.js';
 import { upload, processImages } from '../config/upload.js';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
-// Get all products (public)
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const getProductDir = (productId: number): string =>
+  path.join(__dirname, '../../public/produtos', String(productId));
+
+const saveImageToDisk = (productId: number, buffer: Buffer, index: number): string => {
+  const dir = getProductDir(productId);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const filename = `image-${index}-${productId}.webp`;
+  fs.writeFileSync(path.join(dir, filename), buffer);
+  return `/produtos/${productId}/${filename}`;
+};
+
+const getNextImageIndex = (productId: number): number => {
+  const dir = getProductDir(productId);
+  if (!fs.existsSync(dir)) return 1;
+  const files = fs.readdirSync(dir).filter(f => /^image-\d+-\d+\.webp$/.test(f));
+  if (files.length === 0) return 1;
+  const indices = files.map(f => parseInt(f.split('-')[1]));
+  return Math.max(...indices) + 1;
+};
+
+const parseImages = (images: any): string[] => {
+  if (!images) return [];
+  if (Array.isArray(images)) return images;
+  if (typeof images === 'string') {
+    try { return JSON.parse(images); } catch { return []; }
+  }
+  return [];
+};
+
+// ── GET all products (public) ─────────────────────────────────────────────────
+
 router.get('/', async (req, res) => {
   try {
     const [rows]: any = await pool.query(
-      `SELECT
-        p.*,
-        c.name as category_name,
-        c.slug as category_slug,
-        GROUP_CONCAT(pi.id ORDER BY pi.display_order) as image_ids
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN product_images pi ON p.id = pi.product_id
-      GROUP BY p.id
-      ORDER BY p.created_at DESC`
+      `SELECT p.*, c.name as category_name, c.slug as category_slug
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       ORDER BY p.created_at DESC`
     );
 
-    // Convert image_ids to array of image URLs with cache busting
     const products = rows.map((product: any) => ({
       ...product,
-      images: product.image_ids ?
-        product.image_ids.split(',').map((id: string) => `/products/image/${id}?v=${new Date(product.updated_at).getTime()}`) :
-        []
+      images: parseImages(product.images),
     }));
 
     res.json(products);
@@ -37,49 +67,15 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get product image by ID (serves BLOB as image)
-router.get('/image/:imageId', async (req, res) => {
-  try {
-    const [rows]: any = await pool.query(
-      'SELECT image_data, mime_type FROM product_images WHERE id = ?',
-      [req.params.imageId]
-    );
+// ── GET single product (public) ───────────────────────────────────────────────
 
-    if (rows.length === 0) {
-      res.status(404).json({ error: 'Image not found' });
-      return;
-    }
-
-    const image = rows[0];
-
-    // Set CORS and security headers for images
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
-
-    res.contentType(image.mime_type);
-    res.send(image.image_data);
-  } catch (error) {
-    console.error('Error fetching image:', error);
-    res.status(500).json({ error: 'Failed to fetch image' });
-  }
-});
-
-// Get single product (public)
 router.get('/:id', async (req, res) => {
   try {
     const [rows]: any = await pool.query(
-      `SELECT
-        p.*,
-        c.name as category_name,
-        c.slug as category_slug,
-        GROUP_CONCAT(pi.id ORDER BY pi.display_order) as image_ids
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN product_images pi ON p.id = pi.product_id
-      WHERE p.id = ?
-      GROUP BY p.id`,
+      `SELECT p.*, c.name as category_name, c.slug as category_slug
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       WHERE p.id = ?`,
       [req.params.id]
     );
 
@@ -88,26 +84,20 @@ router.get('/:id', async (req, res) => {
       return;
     }
 
-    const product = {
-      ...rows[0],
-      images: rows[0].image_ids ?
-        rows[0].image_ids.split(',').map((id: string) => `/products/image/${id}?v=${new Date(rows[0].updated_at).getTime()}`) :
-        []
-    };
-
-    res.json(product);
+    res.json({ ...rows[0], images: parseImages(rows[0].images) });
   } catch (error) {
     console.error('Error fetching product:', error);
     res.status(500).json({ error: 'Failed to fetch product' });
   }
 });
 
-// Create product (admin only) - with file upload
+// ── POST / — Create product (admin) ──────────────────────────────────────────
+
 router.post(
   '/',
   ...requireAdmin,
-  upload.array('images', 10), // Max 10 images
-  processImages, // Process and convert images to WebP
+  upload.array('images', 10),
+  processImages,
   async (req: AuthRequest, res) => {
     try {
       const { name, description, price, category, stock, featured, colors } = req.body;
@@ -123,8 +113,7 @@ router.post(
         return;
       }
 
-      // Parse colors if provided
-      let colorsArray = [];
+      let colorsArray: string[] = [];
       if (colors) {
         try {
           colorsArray = typeof colors === 'string' ? JSON.parse(colors) : colors;
@@ -132,37 +121,34 @@ router.post(
           console.error('Error parsing colors:', e);
         }
       }
-      const colorsJson = JSON.stringify(colorsArray);
 
-      // Insert product (without images field since we'll use separate table)
+      // Insert product first to obtain its ID
       const [result]: any = await pool.query(
         'INSERT INTO products (name, description, price, category_id, stock, featured, colors) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [name, description, price, category, stock || 0, featured === 'true', colorsJson]
+        [name, description, price, category, stock || 0, featured === 'true', JSON.stringify(colorsArray)]
       );
-
       const productId = result.insertId;
 
-      // Insert images into product_images table
+      // Save each image to disk
+      const imagePaths: string[] = [];
       for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        await pool.query(
-          'INSERT INTO product_images (product_id, image_data, mime_type, file_size, is_primary, display_order) VALUES (?, ?, ?, ?, ?, ?)',
-          [productId, file.buffer, file.mimetype, file.size, i === 0, i]
-        );
+        imagePaths.push(saveImageToDisk(productId, files[i].buffer, i + 1));
       }
 
+      // Store paths in products table
+      await pool.query('UPDATE products SET images = ? WHERE id = ?', [
+        JSON.stringify(imagePaths),
+        productId,
+      ]);
+
       const [newProduct]: any = await pool.query(
-        `SELECT
-          p.*,
-          c.name as category_name,
-          c.slug as category_slug
-        FROM products p
-        LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.id = ?`,
+        `SELECT p.*, c.name as category_name, c.slug as category_slug
+         FROM products p LEFT JOIN categories c ON p.category_id = c.id
+         WHERE p.id = ?`,
         [productId]
       );
 
-      res.status(201).json(newProduct[0]);
+      res.status(201).json({ ...newProduct[0], images: imagePaths });
     } catch (error) {
       console.error('Error creating product:', error);
       res.status(500).json({ error: 'Failed to create product' });
@@ -170,57 +156,31 @@ router.post(
   }
 );
 
-// Update product (admin only) - with file upload
+// ── PUT /:id — Update product (admin) ────────────────────────────────────────
+
 router.put(
   '/:id',
   ...requireAdmin,
-  upload.array('images', 10), // Max 10 images
-  processImages, // Process and convert images to WebP
+  upload.array('images', 10),
+  processImages,
   async (req: AuthRequest, res) => {
     try {
       console.log('🔄 UPDATE Product ID:', req.params.id);
-      console.log('📝 Request body:', req.body);
-      console.log('📸 Files received:', req.files ? (req.files as Express.Multer.File[]).length : 0);
-      
+
       const { name, description, price, category, stock, featured, existingImages, colors } = req.body;
       const files = req.files as Express.Multer.File[];
+      const productId = parseInt(req.params.id);
 
-      if (files && files.length > 0) {
-        console.log('📤 Files details:');
-        files.forEach((file, idx) => {
-          console.log(`  File ${idx + 1}:`, file.originalname, file.mimetype, file.size);
-        });
-      }
-
+      // Update product fields
       const updates: string[] = [];
       const values: any[] = [];
 
-      if (name !== undefined) {
-        updates.push('name = ?');
-        values.push(name);
-      }
-      if (description !== undefined) {
-        updates.push('description = ?');
-        values.push(description);
-      }
-      if (price !== undefined) {
-        updates.push('price = ?');
-        values.push(price);
-      }
-      if (category !== undefined) {
-        updates.push('category_id = ?');
-        values.push(category);
-      }
-      if (stock !== undefined) {
-        updates.push('stock = ?');
-        values.push(stock);
-      }
-      if (featured !== undefined) {
-        updates.push('featured = ?');
-        values.push(featured === 'true');
-      }
-
-      // Handle colors
+      if (name !== undefined)        { updates.push('name = ?');        values.push(name); }
+      if (description !== undefined) { updates.push('description = ?'); values.push(description); }
+      if (price !== undefined)       { updates.push('price = ?');       values.push(price); }
+      if (category !== undefined)    { updates.push('category_id = ?'); values.push(category); }
+      if (stock !== undefined)       { updates.push('stock = ?');       values.push(stock); }
+      if (featured !== undefined)    { updates.push('featured = ?');    values.push(featured === 'true'); }
       if (colors !== undefined) {
         try {
           const colorsArray = typeof colors === 'string' ? JSON.parse(colors) : colors;
@@ -232,76 +192,61 @@ router.put(
       }
 
       if (updates.length > 0) {
-        values.push(req.params.id);
-        await pool.query(
-          `UPDATE products SET ${updates.join(', ')} WHERE id = ?`,
-          values
-        );
+        values.push(productId);
+        await pool.query(`UPDATE products SET ${updates.join(', ')} WHERE id = ?`, values);
       }
 
-      // Handle images - keep only the existing ones specified
+      // Current images in DB
+      const [currentRows]: any = await pool.query(
+        'SELECT images FROM products WHERE id = ?',
+        [productId]
+      );
+      const currentImages = parseImages(currentRows[0]?.images);
+
+      // Parse the list of paths the admin wants to keep
+      let keepPaths: string[] = [];
       if (existingImages) {
-        console.log('🗂️ Processing existing images:', existingImages);
         try {
-          const keepIds = typeof existingImages === 'string' ? JSON.parse(existingImages) : existingImages;
-          console.log('✅ Parsed keepIds:', keepIds);
-          if (Array.isArray(keepIds) && keepIds.length > 0) {
-            // Delete all images not in the keep list
-            await pool.query(
-              `DELETE FROM product_images WHERE product_id = ? AND id NOT IN (?)`,
-              [req.params.id, keepIds]
-            );
-            console.log('🗑️ Deleted images not in keep list');
-          } else {
-            // No existing images to keep, delete all
-            await pool.query(
-              'DELETE FROM product_images WHERE product_id = ?',
-              [req.params.id]
-            );
-            console.log('🗑️ Deleted all existing images');
-          }
+          keepPaths = typeof existingImages === 'string' ? JSON.parse(existingImages) : existingImages;
         } catch (e) {
-          console.error('❌ Error parsing existing images:', e);
+          console.error('Error parsing existingImages:', e);
         }
       }
 
-      // Add new uploaded images
+      // Delete files that were removed by the admin
+      const dir = getProductDir(productId);
+      for (const currentPath of currentImages) {
+        if (!keepPaths.includes(currentPath)) {
+          const filepath = path.join(dir, path.basename(currentPath));
+          if (fs.existsSync(filepath)) {
+            fs.unlinkSync(filepath);
+            console.log('🗑️ Deleted image:', path.basename(currentPath));
+          }
+        }
+      }
+
+      // Save new uploaded images
+      const newPaths: string[] = [];
       if (files && files.length > 0) {
-        console.log('➕ Adding new images:', files.length);
-        // Get current max display_order
-        const [maxOrder]: any = await pool.query(
-          'SELECT COALESCE(MAX(display_order), -1) as max_order FROM product_images WHERE product_id = ?',
-          [req.params.id]
-        );
-        
-        let nextOrder = (maxOrder[0]?.max_order || -1) + 1;
-        console.log('📊 Starting display_order:', nextOrder);
-
+        let nextIndex = getNextImageIndex(productId);
         for (const file of files) {
-          console.log(`💾 Inserting image: order=${nextOrder}, size=${file.size}, type=${file.mimetype}`);
-          await pool.query(
-            'INSERT INTO product_images (product_id, image_data, mime_type, file_size, is_primary, display_order) VALUES (?, ?, ?, ?, ?, ?)',
-            [req.params.id, file.buffer, file.mimetype, file.size, nextOrder === 0, nextOrder]
-          );
-          nextOrder++;
+          newPaths.push(saveImageToDisk(productId, file.buffer, nextIndex));
+          nextIndex++;
         }
-        console.log('✅ All images inserted successfully');
-      } else {
-        console.log('ℹ️ No new images to add');
       }
+
+      // Final order: existing (in admin's order) + newly uploaded
+      const finalImages = [...keepPaths, ...newPaths];
+      await pool.query('UPDATE products SET images = ? WHERE id = ?', [
+        JSON.stringify(finalImages),
+        productId,
+      ]);
 
       const [updatedProduct]: any = await pool.query(
-        `SELECT
-          p.*,
-          c.name as category_name,
-          c.slug as category_slug,
-          GROUP_CONCAT(pi.id ORDER BY pi.display_order) as image_ids
-        FROM products p
-        LEFT JOIN categories c ON p.category_id = c.id
-        LEFT JOIN product_images pi ON p.id = pi.product_id
-        WHERE p.id = ?
-        GROUP BY p.id`,
-        [req.params.id]
+        `SELECT p.*, c.name as category_name, c.slug as category_slug
+         FROM products p LEFT JOIN categories c ON p.category_id = c.id
+         WHERE p.id = ?`,
+        [productId]
       );
 
       if (updatedProduct.length === 0) {
@@ -309,14 +254,7 @@ router.put(
         return;
       }
 
-      const product = {
-        ...updatedProduct[0],
-        images: updatedProduct[0].image_ids ?
-          updatedProduct[0].image_ids.split(',').map((id: string) => `/products/image/${id}?v=${Date.now()}`) :
-          []
-      };
-
-      res.json(product);
+      res.json({ ...updatedProduct[0], images: finalImages });
     } catch (error) {
       console.error('Error updating product:', error);
       res.status(500).json({ error: 'Failed to update product' });
@@ -324,17 +262,27 @@ router.put(
   }
 );
 
-// Delete product (admin only)
+// ── DELETE /:id — Delete product (admin) ─────────────────────────────────────
+
 router.delete('/:id', ...requireAdmin, async (req: AuthRequest, res) => {
   try {
+    const productId = parseInt(req.params.id);
+
     const [result]: any = await pool.query(
       'DELETE FROM products WHERE id = ?',
-      [req.params.id]
+      [productId]
     );
 
     if (result.affectedRows === 0) {
       res.status(404).json({ error: 'Product not found' });
       return;
+    }
+
+    // Remove image directory from disk
+    const dir = getProductDir(productId);
+    if (fs.existsSync(dir)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+      console.log('🗑️ Deleted product image directory for ID', productId);
     }
 
     res.json({ message: 'Product deleted successfully' });

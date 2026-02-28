@@ -144,7 +144,7 @@ const Contact: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 text-lg">Telefone</h3>
-                    <p className="text-gray-600 mt-1">+351 912 345 678</p>
+                    <p className="text-gray-600 mt-1">+351 919 626 697</p>
                     <p className="text-sm text-gray-400 mt-1">Segunda a Sexta, 9h às 18h</p>
                   </div>
                 </div>
@@ -156,10 +156,10 @@ const Contact: React.FC = () => {
                   <div>
                     <h3 className="font-semibold text-gray-900 text-lg">Email</h3>
                     <a
-                      href="mailto:info@arteemponto.pt"
+                      href="mailto:arteemponto1972@gmail.com"
                       className="text-gray-600 hover:text-primary-600 transition-colors mt-1 block"
                     >
-                      info@arteemponto.pt
+                      arteemponto1972@gmail.com
                     </a>
                     <p className="text-sm text-gray-400 mt-1">Respondemos em 24h</p>
                   </div>

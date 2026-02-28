@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Search, ShoppingCart, Heart, User, LogOut, Package, UserCircle, Settings } from 'lucide-react';
+import { Menu, X, Search, ShoppingCart, Heart, User, LogOut, Package, UserCircle, Settings, Shield } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { useAuth } from '../context/AuthContext';
@@ -67,6 +67,7 @@ const Navbar: React.FC = () => {
   }, [isAuthenticated]);
 
   const [isOpen, setIsOpen] = useState(false);
+  const [isMenuClosing, setIsMenuClosing] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -92,7 +93,7 @@ const Navbar: React.FC = () => {
     { name: 'Início', href: '/' },
     { name: 'Loja', href: '/loja' },
     // { name: 'Sobre', href: '/sobre' },
-    { name: 'Contacto', href: '/contacto' },
+    { name: 'Contato', href: '/contacto' },
   ];
 
   const isActive = (href: string) => {
@@ -163,6 +164,14 @@ const Navbar: React.FC = () => {
     navigate(`/produto/${productId}`);
     setSearchOpen(false);
     setSearchQuery('');
+  };
+
+  const handleCloseMenu = () => {
+    setIsMenuClosing(true);
+    setTimeout(() => {
+      setIsOpen(false);
+      setIsMenuClosing(false);
+    }, 200);
   };
 
   const handleCloseUserMenu = () => {
@@ -492,7 +501,7 @@ const Navbar: React.FC = () => {
 
             {/* Mobile menu button */}
             <button
-              onClick={() => setIsOpen(!isOpen)}
+              onClick={() => isOpen ? handleCloseMenu() : setIsOpen(true)}
               className="md:hidden p-2 text-gray-600 hover:text-primary-600 transition-colors"
             >
               {isOpen ? (
@@ -553,15 +562,15 @@ const Navbar: React.FC = () => {
         )}
 
         {/* Mobile Navigation */}
-        {isOpen && (
-          <div className="md:hidden">
+        {(isOpen || isMenuClosing) && (
+          <div className={`md:hidden ${isMenuClosing ? 'animate-menuSlideUp' : 'animate-menuSlideDown'}`}>
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-t">
               {/* Navigation Links */}
               {navigation.map((item) => (
                 <Link
                   key={item.name}
                   to={item.href}
-                  onClick={() => setIsOpen(false)}
+                  onClick={handleCloseMenu}
                   className={`block px-3 py-2 text-base font-medium transition-colors ${
                     isActive(item.href)
                       ? 'text-primary-600 bg-primary-50'
@@ -578,7 +587,7 @@ const Navbar: React.FC = () => {
               {/* Favorites - Mobile */}
               <Link
                 to="/favoritos"
-                onClick={() => setIsOpen(false)}
+                onClick={handleCloseMenu}
                 className="w-full flex items-center justify-between px-3 py-2 text-base font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-colors"
               >
                 <div className="flex items-center gap-3">
@@ -595,7 +604,7 @@ const Navbar: React.FC = () => {
               {/* Cart - Mobile */}
               <Link
                 to="/carrinho"
-                onClick={() => setIsOpen(false)}
+                onClick={handleCloseMenu}
                 className="w-full flex items-center justify-between px-3 py-2 text-base font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-colors"
               >
                 <div className="flex items-center gap-3">
@@ -615,8 +624,8 @@ const Navbar: React.FC = () => {
               {/* User Account - Mobile */}
               <button
                 onClick={() => {
-                  setIsOpen(false);
-                  setUserMenuOpen(true);
+                  handleCloseMenu();
+                  setTimeout(() => setUserMenuOpen(true), 200);
                 }}
                 className="w-full flex items-center gap-3 px-3 py-2 text-base font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-colors"
               >

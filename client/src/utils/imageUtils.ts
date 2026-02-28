@@ -24,17 +24,20 @@ export const getImageCacheKey = (): number => {
 };
 
 /**
- * Converts relative image URL from backend to absolute URL
- * @param imageUrl - Relative URL from backend (e.g., "/products/image/1?v=123")
- * @returns Absolute URL with API base
+ * Returns the image URL ready to use in <img src>.
+ * - Absolute URLs are returned as-is.
+ * - Relative paths (e.g. /produtos/1/image-1-1.webp) are prefixed with the
+ *   backend origin so they work even when the frontend is on a different domain.
+ *   In dev, VITE_API_URL defaults to http://localhost:3001 (Vite also proxies /produtos).
+ *   In production, set VITE_API_URL to the backend domain (e.g. https://arteemponto.pt).
  */
 export const getAbsoluteImageUrl = (imageUrl: string): string => {
   if (!imageUrl) return '';
 
-  // If already absolute, return as is
+  // Already absolute
   if (imageUrl.startsWith('http')) return imageUrl;
 
-  // Add API base URL (VITE_API_URL should NOT have /api at the end)
-  const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
-  return `${API_BASE}${imageUrl}`;
+  // Prefix with backend origin so the path resolves correctly on any deployment
+  const backendOrigin = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  return `${backendOrigin}${imageUrl}`;
 };

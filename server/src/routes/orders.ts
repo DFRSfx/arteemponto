@@ -25,11 +25,7 @@ router.get('/', ...requireAdmin, async (req: AuthRequest, res) => {
             'product', JSON_OBJECT(
               'id', p.id,
               'name', p.name,
-              'image', (SELECT CONCAT('/products/image/', pi.id, CHAR(63), 'v=', UNIX_TIMESTAMP(p.updated_at) * 1000) 
-                        FROM product_images pi 
-                        WHERE pi.product_id = p.id 
-                        ORDER BY pi.display_order 
-                        LIMIT 1)
+              'image', JSON_UNQUOTE(JSON_EXTRACT(p.images, '$[0]'))
             )
           )
         ) as order_items
@@ -69,11 +65,7 @@ router.get('/my-orders', authenticateToken, async (req: AuthRequest, res) => {
             'product', JSON_OBJECT(
               'id', p.id,
               'name', p.name,
-              'image', (SELECT CONCAT('/api/products/image/', pi.id, CHAR(63), 'v=', UNIX_TIMESTAMP(p.updated_at) * 1000) 
-                        FROM product_images pi 
-                        WHERE pi.product_id = p.id 
-                        ORDER BY pi.display_order 
-                        LIMIT 1)
+              'image', JSON_UNQUOTE(JSON_EXTRACT(p.images, '$[0]'))
             )
           )
         ) as order_items
@@ -111,11 +103,7 @@ router.get('/:id', ...requireAdmin, async (req: AuthRequest, res) => {
             'product', JSON_OBJECT(
               'id', p.id,
               'name', p.name,
-              'image', (SELECT CONCAT('/products/image/', pi.id, CHAR(63), 'v=', UNIX_TIMESTAMP(p.updated_at) * 1000) 
-                        FROM product_images pi 
-                        WHERE pi.product_id = p.id 
-                        ORDER BY pi.display_order 
-                        LIMIT 1)
+              'image', JSON_UNQUOTE(JSON_EXTRACT(p.images, '$[0]'))
             )
           )
         ) as order_items
@@ -193,8 +181,9 @@ router.post(
         items_count: items.length
       });
 
-      // Calculate total
-      const total = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+      // Calculate total including 23% VAT (matches what Stripe charges)
+      const subtotal = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+      const total = parseFloat((subtotal * 1.23).toFixed(2));
 
       // Generate tracking token for guest orders
       const trackingToken = generateTrackingToken();
@@ -233,9 +222,9 @@ router.post(
           [orderId, item.product_id, item.quantity, item.price]
         );
 
-        // Update product stock
+        // Update product stock (GREATEST prevents unsigned underflow when stock is 0)
         await connection.query(
-          'UPDATE products SET stock = stock - ? WHERE id = ?',
+          'UPDATE products SET stock = GREATEST(0, stock - ?) WHERE id = ?',
           [item.quantity, item.product_id]
         );
       }
@@ -291,6 +280,36 @@ router.post(
       });
     } finally {
       connection.release();
+    }
+  }
+);
+
+// Save Multibanco payment reference after Stripe confirmation (public)
+router.patch(
+  '/:id/payment-reference',
+  [
+    body('entity').trim().notEmpty().withMessage('Entity is required'),
+    body('reference').trim().notEmpty().withMessage('Reference is required')
+  ],
+  async (req: any, res: any) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      const { entity, reference } = req.body;
+
+      await pool.query(
+        'UPDATE orders SET payment_entity = ?, payment_reference = ? WHERE id = ?',
+        [entity, reference, req.params.id]
+      );
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error saving payment reference:', error);
+      res.status(500).json({ error: 'Failed to save payment reference' });
     }
   }
 );
@@ -383,11 +402,7 @@ router.get('/track/:token', async (req, res) => {
             'product', JSON_OBJECT(
               'id', p.id,
               'name', p.name,
-              'image', (SELECT CONCAT('/api/products/image/', pi.id, CHAR(63), 'v=', UNIX_TIMESTAMP(p.updated_at) * 1000) 
-                        FROM product_images pi 
-                        WHERE pi.product_id = p.id 
-                        ORDER BY pi.display_order 
-                        LIMIT 1)
+              'image', JSON_UNQUOTE(JSON_EXTRACT(p.images, '$[0]'))
             )
           )
         ) as order_items

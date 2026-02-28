@@ -12,7 +12,7 @@ interface AuthModalProps {
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'login' }) => {
-  const { isAuthenticated, login, register } = useAuth();
+  const { isAuthenticated, login, register, setAuthState } = useAuth();
   const { success, error: showError } = useToast();
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(initialMode);
   const [loginData, setLoginData] = useState({ email: '', password: '' });
@@ -106,17 +106,13 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
 
           const data = await response.json();
 
-          // Store token and user data in localStorage
-          localStorage.setItem('auth_token', data.token);
-          localStorage.setItem('auth_user', JSON.stringify(data.user));
+          // Update auth context directly (no reload needed)
+          setAuthState(data.token, data.user);
 
           // Clean the URL
           window.history.replaceState({}, document.title, window.location.pathname);
 
           success('Bem-vindo! Login efetuado com sucesso 🎉');
-
-          // Reload to update auth context
-          window.location.reload();
         } catch (err: any) {
           // Clear the processed code on error so user can retry
           sessionStorage.removeItem('google_oauth_processed_code');
@@ -261,12 +257,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
 
         const data = await response.json();
 
-        // Store token and user data in localStorage
-        localStorage.setItem('auth_token', data.token);
-        localStorage.setItem('auth_user', JSON.stringify(data.user));
-
-        // Reload the page to update the auth context
-        window.location.reload();
+        // Update auth context directly (no reload needed)
+        setAuthState(data.token, data.user);
 
         success('Bem-vindo! Login efetuado com sucesso 🎉');
       } catch (err: any) {

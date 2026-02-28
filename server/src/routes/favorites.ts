@@ -36,22 +36,19 @@ router.get('/', async (req: AuthRequest, res) => {
         p.category_id,
         c.name as category,
         p.featured,
-        GROUP_CONCAT(pi.id ORDER BY pi.display_order) as image_ids
+        p.images
       FROM favorites f
       JOIN products p ON f.product_id = p.id
       LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN product_images pi ON p.id = pi.product_id
       WHERE ${userId ? 'f.user_id = ?' : 'f.session_id = ?'}
-      GROUP BY f.id, f.product_id, f.created_at, p.name, p.description, p.price, p.stock, p.category_id, c.name, p.featured
       ORDER BY f.created_at DESC
     `;
 
     const [favorites] = await pool.query(query, [userId || sessionId]);
 
-    // Convert image_ids to array of image URLs and ensure price is a number
     const formattedFavorites = (favorites as any[]).map(item => ({
       id: item.id,
-      product_id: String(item.product_id), // Convert to string for consistency
+      product_id: String(item.product_id),
       product_name: item.product_name,
       description: item.description,
       price: parseFloat(item.price),
@@ -60,9 +57,9 @@ router.get('/', async (req: AuthRequest, res) => {
       category: item.category || '',
       featured: item.featured,
       created_at: item.created_at,
-      images: item.image_ids ?
-        item.image_ids.split(',').map((id: string) => `/products/image/${id}?v=${Date.now()}`) :
-        []
+      images: item.images
+        ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images)
+        : []
     }));
 
     res.json({ favorites: formattedFavorites });

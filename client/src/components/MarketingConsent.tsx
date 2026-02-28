@@ -108,7 +108,7 @@ const MarketingConsent: React.FC = () => {
         ========================================
       */}
       {(showNewsletter || showPreferences) && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-[40] animate-fade-in" />
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-[51] animate-fade-in" />
       )}
 
       {/* ========================================
@@ -116,7 +116,7 @@ const MarketingConsent: React.FC = () => {
         ========================================
       */}
       {showNewsletter && (
-        <div className="fixed inset-0 z-[50] flex items-center justify-center p-4 pointer-events-none">
+        <div className="fixed inset-0 z-[55] flex items-center justify-center p-4 pointer-events-none">
           <div className="relative bg-white w-full max-w-[750px] grid md:grid-cols-2 shadow-2xl overflow-hidden rounded-sm pointer-events-auto animate-scale-in">
             <button 
               onClick={handleCloseNewsletter}

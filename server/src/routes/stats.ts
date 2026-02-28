@@ -46,25 +46,19 @@ router.get('/dashboard', ...requireAdmin, async (req: AuthRequest, res) => {
 
     // Get low stock products with images and category names
     const [lowStockProducts]: any = await pool.query(`
-      SELECT
-        p.*,
-        c.name as category,
-        GROUP_CONCAT(pi.id ORDER BY pi.display_order) as image_ids
+      SELECT p.*, c.name as category
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN product_images pi ON p.id = pi.product_id
       WHERE p.stock <= 10
-      GROUP BY p.id
       ORDER BY p.stock ASC
       LIMIT 5
     `);
 
-    // Convert image_ids to array of image URLs for low stock products
     const lowStockProductsWithImages = lowStockProducts.map((product: any) => ({
       ...product,
-      images: product.image_ids ?
-        product.image_ids.split(',').map((id: string) => `/products/image/${id}?v=${Date.now()}`) :
-        []
+      images: product.images
+        ? (typeof product.images === 'string' ? JSON.parse(product.images) : product.images)
+        : []
     }));
 
     // Get sales by category

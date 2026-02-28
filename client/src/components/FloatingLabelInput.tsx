@@ -38,12 +38,10 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
     <div className="w-full relative">
       <label
         htmlFor={id}
-        className={`absolute left-5 bg-white px-2 transition-all duration-200 pointer-events-none ${
-          Icon ? 'left-14' : 'left-5'
-        } ${
+        className={`absolute bg-white px-2 transition-all duration-200 pointer-events-none ${
           shouldFloat
-            ? 'top-0 -translate-y-1/2 text-sm text-primary-600'
-            : 'top-1/2 -translate-y-1/2 text-gray-500'
+            ? 'left-4 top-0 -translate-y-1/2 text-sm text-primary-600'
+            : `${Icon ? 'left-14' : 'left-5'} top-1/2 -translate-y-1/2 text-gray-500`
         }`}
       >
         {label} {required && '*'}

@@ -12,8 +12,7 @@ export interface BackendProduct {
   category_id: number;
   category_name?: string;
   category_slug?: string;
-  images?: string[]; // Array of image URLs from product_images table
-  image_ids?: string; // Comma-separated image IDs (internal use)
+  images?: string[]; // Array of image file paths (e.g. ["/public/produtos/1/image-1-1.webp"])
   colors?: string[] | string; // JSON field, array of color names
   stock: number | string; // May come as string
   featured: boolean | number; // MySQL BOOLEAN (TINYINT) comes as 0/1
@@ -34,8 +33,7 @@ export interface BackendCategory {
 
 // Convert backend product to frontend product
 export function adaptProductToFrontend(backendProduct: BackendProduct): FrontendProduct {
-  // Get images from the new system (product_images table)
-  // Backend already sends images as array of URLs like ['/api/products/image/1', '/api/products/image/2']
+  // Images are stored as files on disk; backend sends paths like ['/public/produtos/1/image-1-1.webp']
   let images: string[] = [];
   if (backendProduct.images && Array.isArray(backendProduct.images)) {
     images = backendProduct.images;
