@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ordersApi } from '../../utils/apiHelpers';
 import { ArrowLeft, Package, User, MapPin, CreditCard, Calendar } from 'lucide-react';
+import AdminSelect from '../components/AdminSelect';
 import { getAbsoluteImageUrl } from '../../utils/imageUtils';
 
 interface OrderItem {
@@ -188,11 +189,12 @@ export default function OrderDetails() {
           {/* Status */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Estado da Encomenda</h2>
-            <select
+            <AdminSelect
               value={order.status}
               onChange={(e) => updateStatus(e.target.value)}
               disabled={updating}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none disabled:opacity-50"
+              wrapperClassName="w-full"
+              className="py-2"
             >
               {statusOptions.map(status => {
                 const labels: Record<string, string> = {
@@ -203,7 +205,7 @@ export default function OrderDetails() {
                   <option key={status} value={status}>{labels[status] ?? status}</option>
                 );
               })}
-            </select>
+            </AdminSelect>
           </div>
 
           {/* Payment */}

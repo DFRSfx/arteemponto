@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ordersApi } from '../../utils/apiHelpers';
 import { Eye, Search, Calendar, CreditCard } from 'lucide-react';
+import AdminSelect from '../components/AdminSelect';
 
 interface Order {
   id: number;
@@ -125,11 +126,12 @@ export default function OrdersList() {
             </div>
             <div className="w-full sm:w-48">
               <label htmlFor="status-filter" className="sr-only">Filtrar por estado</label>
-              <select
+              <AdminSelect
                 id="status-filter"
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow bg-white cursor-pointer"
+                wrapperClassName="w-full"
+                className="py-2"
               >
                 <option value="all">Todos os estados</option>
                 <option value="pending">Pendente</option>
@@ -137,7 +139,7 @@ export default function OrdersList() {
                 <option value="shipped">Enviado</option>
                 <option value="delivered">Entregue</option>
                 <option value="cancelled">Cancelado</option>
-              </select>
+              </AdminSelect>
             </div>
           </div>
         </div>

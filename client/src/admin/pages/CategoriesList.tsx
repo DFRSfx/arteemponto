@@ -1,4 +1,11 @@
 import { useState, useEffect } from 'react';
+
+const generateSlug = (name: string) =>
+  name.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
 import { categoriesApi } from '../../utils/apiHelpers';
 import { useConfirmStore } from '../../hooks/useConfirm';
 import { useToast } from '../../context/ToastContext';
@@ -24,7 +31,6 @@ export default function CategoriesList() {
     name: '',
     slug: '',
     description: '',
-    image: ''
   });
 
   useEffect(() => {
@@ -47,7 +53,7 @@ export default function CategoriesList() {
     try {
       await categoriesApi.create(formData);
       setShowAddForm(false);
-      setFormData({ name: '', slug: '', description: '', image: '' });
+      setFormData({ name: '', slug: '', description: '' });
       loadCategories();
     } catch (error) {
       console.error('Error adding category:', error);
@@ -118,37 +124,33 @@ export default function CategoriesList() {
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    setFormData(prev => ({ ...prev, name, slug: generateSlug(name) }));
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Slug</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Endereço web
+                  <span className="ml-1 text-xs text-gray-400 font-normal">(gerado automaticamente)</span>
+                </label>
                 <input
                   type="text"
                   value={formData.slug}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
-                  required
+                  onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none font-mono text-sm text-gray-500"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
               <input
                 type="text"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
-              <input
-                type="url"
-                value={formData.image}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
               />
             </div>
@@ -169,7 +171,7 @@ export default function CategoriesList() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Nome</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Slug</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Endereço web</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Descrição</th>
                 <th className="px-6 py-4 text-right text-sm font-semibold text-gray-700">Ações</th>
               </tr>
@@ -303,12 +305,15 @@ export default function CategoriesList() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Slug</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Endereço web
+                    <span className="ml-1 text-xs text-gray-400 font-normal">(usado no URL da loja)</span>
+                  </label>
                   <input
                     type="text"
                     value={categories.find(c => c.id === editingId)?.slug || ''}
                     onChange={(e) => updateCategory(editingId, 'slug', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none text-base"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none text-base font-mono text-sm text-gray-500"
                   />
                 </div>
 

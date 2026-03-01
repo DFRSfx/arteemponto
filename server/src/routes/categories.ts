@@ -45,7 +45,7 @@ router.post(
   ...requireAdmin,
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
-    body('slug').trim().notEmpty().withMessage('Slug is required'),
+    body('slug').optional().trim(),
     body('description').optional().trim(),
     body('image').optional().trim()
   ],
@@ -57,7 +57,13 @@ router.post(
         return;
       }
 
-      const { name, slug, description, image } = req.body;
+      const { name, description, image } = req.body;
+      const slug = req.body.slug?.trim() ||
+        name.toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9\s-]/g, '')
+          .trim()
+          .replace(/\s+/g, '-');
 
       const [result]: any = await pool.query(
         'INSERT INTO categories (name, slug, description, image) VALUES (?, ?, ?, ?)',

@@ -4,6 +4,7 @@ import { productsApi } from '../../utils/apiHelpers';
 import { useCategories } from '../../hooks/useCategories';
 import { Save, ArrowLeft, X, Upload, GripVertical, ChevronLeft, ChevronRight } from 'lucide-react';
 import ColorPicker from '../components/ColorPicker';
+import AdminSelect from '../components/AdminSelect';
 
 interface ProductFormData {
   name: string;
@@ -275,7 +276,7 @@ export default function ProductForm() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Categoria *
               </label>
-              <select
+              <AdminSelect
                 value={formData.category_id}
                 onChange={(e) => {
                   const numValue = parseInt(e.target.value, 10);
@@ -283,7 +284,8 @@ export default function ProductForm() {
                     setFormData({ ...formData, category_id: numValue });
                   }
                 }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                wrapperClassName="w-full"
+                className="py-2"
                 required
               >
                 <option value={0}>Selecione uma categoria</option>
@@ -292,7 +294,7 @@ export default function ProductForm() {
                     {cat.name}
                   </option>
                 ))}
-              </select>
+              </AdminSelect>
             </div>
           </div>
 

@@ -61,10 +61,10 @@ CREATE TABLE IF NOT EXISTS `categories` (
 -- A despejar dados para tabela arte_em_ponto.categories: ~4 rows (aproximadamente)
 DELETE FROM `categories`;
 INSERT INTO `categories` (`id`, `name`, `slug`, `description`, `image`, `created_at`) VALUES
-	(1, 'Malas', 'malas', 'Malas únicas em crochê', 'https://scontent.cdninstagram.com/v/t51.82787-15/572064921_17864228973493048_7979237642739787165_n.jpg?stp=dst-jpegr_e35_tt6&_nc_cat=105&ig_cache_key=Mzc1MTE2Mzk5OTUxMDM0NDEwNA%3D%3D.3-ccb1-7&ccb=1-7&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6InhwaWRzLjE0NDB4', '2025-10-28 01:00:00'),
-	(2, 'Acessórios', 'acessorios', 'Peças únicas em crochê', 'https://scontent.cdninstagram.com/v/t51.82787-15/572064921_17864228973493048_7979237642739787165_n.jpg?stp=dst-jpegr_e35_tt6&_nc_cat=105&ig_cache_key=Mzc1MTE2Mzk5OTUxMDM0NDEwNA%3D%3D.3-ccb1-7&ccb=1-7&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6InhwaWRzLjE0NDB4', '2025-10-28 01:00:00'),
-	(3, 'Terços', 'tercos', 'Peças únicas em crochê', 'https://scontent.cdninstagram.com/v/t51.82787-15/572064921_17864228973493048_7979237642739787165_n.jpg?stp=dst-jpegr_e35_tt6&_nc_cat=105&ig_cache_key=Mzc1MTE2Mzk5OTUxMDM0NDEwNA%3D%3D.3-ccb1-7&ccb=1-7&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6InhwaWRzLjE0NDB4', '2025-10-28 01:00:00'),
-	(4, 'Roupa', 'roupa', 'Peças únicas em crochê', 'https://scontent.cdninstagram.com/v/t51.82787-15/572064921_17864228973493048_7979237642739787165_n.jpg?stp=dst-jpegr_e35_tt6&_nc_cat=105&ig_cache_key=Mzc1MTE2Mzk5OTUxMDM0NDEwNA%3D%3D.3-ccb1-7&ccb=1-7&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6InhwaWRzLjE0NDB4', '2025-10-28 01:00:00');
+	(1, 'Malas', 'malas', 'Malas únicas em crochê', NULL, '2025-10-28 01:00:00'),
+	(2, 'Acessórios', 'acessorios', 'Peças únicas em crochê', NULL, '2025-10-28 01:00:00'),
+	(3, 'Terços', 'tercos', 'Peças únicas em crochê', NULL, '2025-10-28 01:00:00'),
+	(4, 'Roupa', 'roupa', 'Peças únicas em crochê', NULL, '2025-10-28 01:00:00');
 
 -- A despejar estrutura para evento arte_em_ponto.cleanup_expired_email_verification_tokens
 DELIMITER //
@@ -196,15 +196,8 @@ CREATE TABLE IF NOT EXISTS `orders` (
   CONSTRAINT `fk_order_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=50 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Pedidos de clientes';
 
--- A despejar dados para tabela arte_em_ponto.orders: ~6 rows (aproximadamente)
+-- A despejar dados para tabela arte_em_ponto.orders: ~0 rows (aproximadamente)
 DELETE FROM `orders`;
-INSERT INTO `orders` (`id`, `tracking_token`, `user_id`, `customer_name`, `customer_email`, `customer_phone`, `customer_address`, `customer_city`, `customer_postal_code`, `total`, `status`, `payment_status`, `payment_method`, `payment_reference`, `payment_entity`, `created_at`, `updated_at`, `payment_intent_id`) VALUES
-	(44, 'ba7cd551968df6a742a9737eedb76b7b7b2e548cd2e9460aa7807e27bccd9ef4', 11, 'Conta Testes', 'dariosoares2005@gmail.com', '919792186', 'Rua de Sermonde nº445', 'Vila Nova de Gaia', '4415-115', 12.30, 'processing', 'paid', 'mbway', NULL, NULL, '2026-02-26 22:29:53', '2026-02-26 22:29:53', 'pi_3T5D3vAekY23uh7L1G7Hc5vC'),
-	(45, 'af8b7c862a39e2dfc36db33684c2d0153d194f0a1a6f4975ce85adc6a2574d65', 11, 'Conta Testes', 'dariosoares2005@gmail.com', '919792186', 'Rua de Sermonde nº445', 'Vila Nova de Gaia', '4415-115', 12.30, 'processing', 'paid', 'mbway', NULL, NULL, '2026-02-26 22:43:53', '2026-02-26 22:43:53', 'pi_3T5DHMAekY23uh7L0QEwYgCa'),
-	(46, '3f7b0035a5e426aee735531608edec0a43c1760283cc23cc4a397ff3e7d6614f', 11, 'Conta Testes', 'dariosoares2005@gmail.com', '919792186', 'Rua de Sermonde nº445', 'Vila Nova de Gaia', '4415-115', 12.30, 'processing', 'paid', 'mbway', NULL, NULL, '2026-02-26 22:46:02', '2026-02-26 22:46:02', 'pi_3T5DJYAekY23uh7L16Ii7owF'),
-	(47, 'bf959843fd70dbd61ebb75fea75ee9e84d591afa98259ac24ad903226d777b8c', 15, 'Dário Soares', 'flexrpbase@gmail.com', '919792186', 'Rua de Sermonde', 'Vila Nova de Gaia', '4444-444', 12.30, 'processing', 'paid', 'mbway', NULL, NULL, '2026-02-27 18:04:18', '2026-02-27 18:04:18', 'pi_3T5VONAekY23uh7L0ydkL7jp'),
-	(48, 'cab9786ace59ca43a5cb881d7f6219073e51fca88e7a8275882268c8ad25d1e4', 11, 'Conta Testes', 'dariosoares2005@gmail.com', '919792186', 'Rua de Sermonde nº445', 'Vila Nova de Gaia', '4415-115', 10.00, 'processing', 'paid', 'mbway', NULL, NULL, '2026-02-27 22:35:14', '2026-02-27 22:35:14', 'pi_3T5ZccAekY23uh7L0evMwQX0'),
-	(49, 'f69261f446dfa93f04ce6d970bb8203f92057869ba09c44484f54a82094e6387', 11, 'Conta Testes', 'dariosoares2005@gmail.com', '919792186', 'Rua de Sermonde nº445', 'Vila Nova de Gaia', '4415-115', 40.00, 'processing', 'paid', 'mbway', NULL, NULL, '2026-02-28 11:06:51', '2026-02-28 11:06:52', 'pi_3T5lLwAekY23uh7L0GGIFZCS');
 
 -- A despejar estrutura para tabela arte_em_ponto.order_items
 CREATE TABLE IF NOT EXISTS `order_items` (
@@ -220,16 +213,8 @@ CREATE TABLE IF NOT EXISTS `order_items` (
   CONSTRAINT `fk_orderitem_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=50 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Itens de cada pedido';
 
--- A despejar dados para tabela arte_em_ponto.order_items: ~7 rows (aproximadamente)
+-- A despejar dados para tabela arte_em_ponto.order_items: ~0 rows (aproximadamente)
 DELETE FROM `order_items`;
-INSERT INTO `order_items` (`id`, `order_id`, `product_id`, `quantity`, `price`) VALUES
-	(43, 44, 11, 1, 10.00),
-	(44, 45, 2, 1, 10.00),
-	(45, 46, 11, 1, 10.00),
-	(46, 47, 2, 1, 10.00),
-	(47, 48, 11, 1, 10.00),
-	(48, 49, 11, 2, 10.00),
-	(49, 49, 6, 2, 10.00);
 
 -- A despejar estrutura para tabela arte_em_ponto.password_reset_attempts
 CREATE TABLE IF NOT EXISTS `password_reset_attempts` (
@@ -275,12 +260,8 @@ CREATE TABLE IF NOT EXISTS `pending_checkouts` (
   PRIMARY KEY (`payment_intent_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- A despejar dados para tabela arte_em_ponto.pending_checkouts: ~3 rows (aproximadamente)
+-- A despejar dados para tabela arte_em_ponto.pending_checkouts: ~0 rows (aproximadamente)
 DELETE FROM `pending_checkouts`;
-INSERT INTO `pending_checkouts` (`payment_intent_id`, `data`, `created_at`) VALUES
-	('pi_3T5ZbBAekY23uh7L0UamZYui', '{"customer_name":"Conta Testes","customer_email":"dariosoares2005@gmail.com","customer_phone":"919792186","customer_address":"Rua de Sermonde nº445","customer_city":"Vila Nova de Gaia","customer_postal_code":"4415-115","payment_method":"mbway","items":[{"product_id":11,"quantity":1,"price":10}],"total":12.3,"user_id":11,"save_address":false}', '2026-02-27 22:33:29'),
-	('pi_3T5ZbIAekY23uh7L0HgnTh4O', '{"customer_name":"Conta Testes","customer_email":"dariosoares2005@gmail.com","customer_phone":"919792186","customer_address":"Rua de Sermonde nº445","customer_city":"Vila Nova de Gaia","customer_postal_code":"4415-115","payment_method":"mbway","items":[{"product_id":11,"quantity":1,"price":10}],"total":12.3,"user_id":11,"save_address":false}', '2026-02-27 22:33:36'),
-	('pi_3T5ZcXAekY23uh7L1ZlXaxhT', '{"customer_name":"Conta Testes","customer_email":"dariosoares2005@gmail.com","customer_phone":"919792186","customer_address":"Rua de Sermonde nº445","customer_city":"Vila Nova de Gaia","customer_postal_code":"4415-115","payment_method":"mbway","items":[{"product_id":11,"quantity":1,"price":10}],"total":10,"user_id":11,"save_address":false}', '2026-02-27 22:34:52');
 
 -- A despejar estrutura para tabela arte_em_ponto.products
 CREATE TABLE IF NOT EXISTS `products` (
@@ -339,12 +320,8 @@ CREATE TABLE IF NOT EXISTS `shipping_addresses` (
   CONSTRAINT `fk_shipping_address_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Moradas de entrega guardadas';
 
--- A despejar dados para tabela arte_em_ponto.shipping_addresses: ~3 rows (aproximadamente)
+-- A despejar dados para tabela arte_em_ponto.shipping_addresses: ~0 rows (aproximadamente)
 DELETE FROM `shipping_addresses`;
-INSERT INTO `shipping_addresses` (`id`, `user_id`, `name`, `address`, `city`, `postal_code`, `phone`, `is_default`, `created_at`, `updated_at`) VALUES
-	(1, 13, 'Morada Principal', 'Rua de Sermonde nº 445', 'Vila Nova de Gaia', '4415-115', '919792186', 1, '2025-11-23 03:21:46', '2025-11-23 03:21:46'),
-	(2, 11, 'Morada Principal', 'Rua de Sermonde nº445', 'Vila Nova de Gaia', '4415-115', '919792186', 1, '2025-11-23 03:25:18', '2025-11-23 03:25:18'),
-	(3, 15, 'Morada Principal', 'Rua de Sermonde', 'Vila Nova de Gaia', '4444-444', '919792186', 1, '2026-02-27 18:04:18', '2026-02-27 18:04:18');
 
 -- A despejar estrutura para tabela arte_em_ponto.users
 CREATE TABLE IF NOT EXISTS `users` (

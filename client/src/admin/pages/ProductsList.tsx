@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { productsApi } from '../../utils/apiHelpers';
 import { Plus, Edit, Trash2, Search } from 'lucide-react';
+import AdminSelect from '../components/AdminSelect';
 import { useToast } from '../../context/ToastContext';
 import { getAbsoluteImageUrl, imgVariant } from '../../utils/imageUtils';
 
@@ -112,17 +113,17 @@ export default function ProductsList() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
             />
           </div>
-          <select
+          <AdminSelect
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
+            className="py-2"
           >
             {categories.map(cat => (
               <option key={cat} value={cat}>
                 {cat === 'all' ? 'Todas as Categorias' : cat}
               </option>
             ))}
-          </select>
+          </AdminSelect>
         </div>
       </div>
 

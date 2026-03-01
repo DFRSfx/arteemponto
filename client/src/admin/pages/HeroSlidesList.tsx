@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X, MoveVertical, Eye, EyeOff } from 'lucide-react';
+import AdminSelect from '../components/AdminSelect';
 import { useToast } from '../../context/ToastContext';
 
 const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -403,10 +404,11 @@ export default function HeroSlidesList() {
               </div>
 
               {formData.button_link_type === 'page' && (
-                <select
+                <AdminSelect
                   value={formData.button_link}
                   onChange={(e) => setFormData({ ...formData, button_link: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
+                  wrapperClassName="w-full"
+                  className="py-3"
                   required
                 >
                   <option value="/loja">🛍️ Loja (Todos os Produtos)</option>
@@ -414,14 +416,15 @@ export default function HeroSlidesList() {
                   <option value="/loja?filter=featured">⭐ Produtos em Destaque</option>
                   <option value="/favoritos">❤️ Favoritos</option>
                   <option value="/">🏠 Página Inicial</option>
-                </select>
+                </AdminSelect>
               )}
 
               {formData.button_link_type === 'category' && (
-                <select
+                <AdminSelect
                   value={formData.button_link}
                   onChange={(e) => setFormData({ ...formData, button_link: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
+                  wrapperClassName="w-full"
+                  className="py-3"
                   required
                 >
                   <option value="">Selecione uma categoria</option>
@@ -430,7 +433,7 @@ export default function HeroSlidesList() {
                       {cat.name}
                     </option>
                   ))}
-                </select>
+                </AdminSelect>
               )}
 
               {formData.button_link_type === 'custom' && (
@@ -448,14 +451,15 @@ export default function HeroSlidesList() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Cor do Texto</label>
-                <select
+                <AdminSelect
                   value={formData.text_color}
                   onChange={(e) => setFormData({ ...formData, text_color: e.target.value as 'white' | 'dark' })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
+                  wrapperClassName="w-full"
+                  className="py-2"
                 >
                   <option value="white">Branco</option>
                   <option value="dark">Escuro</option>
-                </select>
+                </AdminSelect>
               </div>
             </div>
 
@@ -708,24 +712,26 @@ export default function HeroSlidesList() {
                         </div>
 
                         {detectLinkType(slide.button_link) === 'page' && (
-                          <select
+                          <AdminSelect
                             value={slide.button_link}
                             onChange={(e) => updateSlide(editingId, 'button_link', e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none text-base"
+                            wrapperClassName="w-full"
+                            className="py-3 text-base"
                           >
                             <option value="/loja">🛍️ Loja (Todos os Produtos)</option>
                             <option value="/loja?filter=new">✨ Novidades</option>
                             <option value="/loja?filter=featured">⭐ Produtos em Destaque</option>
                             <option value="/favoritos">❤️ Favoritos</option>
                             <option value="/">🏠 Página Inicial</option>
-                          </select>
+                          </AdminSelect>
                         )}
 
                         {detectLinkType(slide.button_link) === 'category' && (
-                          <select
+                          <AdminSelect
                             value={slide.button_link}
                             onChange={(e) => updateSlide(editingId, 'button_link', e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none text-base"
+                            wrapperClassName="w-full"
+                            className="py-3 text-base"
                           >
                             <option value="">Selecione uma categoria</option>
                             {categories.map(cat => (
@@ -733,7 +739,7 @@ export default function HeroSlidesList() {
                                 {cat.name}
                               </option>
                             ))}
-                          </select>
+                          </AdminSelect>
                         )}
 
                         {detectLinkType(slide.button_link) === 'custom' && (
@@ -768,14 +774,15 @@ export default function HeroSlidesList() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">Cor do Texto</label>
-                          <select
+                          <AdminSelect
                             value={slide.text_color}
                             onChange={(e) => updateSlide(editingId, 'text_color', e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none text-base"
+                            wrapperClassName="w-full"
+                            className="py-3 text-base"
                           >
                             <option value="white">Branco</option>
                             <option value="dark">Escuro</option>
-                          </select>
+                          </AdminSelect>
                         </div>
 
                         <div>

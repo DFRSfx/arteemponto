@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, User, Mail, AlertCircle, Lock } from 'lucide-react';
+import { getAbsoluteImageUrl } from '../utils/imageUtils';
 import { loadStripe } from '@stripe/stripe-js';
 import type { Appearance } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -24,9 +25,9 @@ const stripeAppearance: Appearance = {
     colorTextSecondary: '#6b7280',
     colorTextPlaceholder: '#9ca3af',
     fontFamily: '"Urbanist", "Open Sans", sans-serif',
-    fontSizeBase: '15px',
+    fontSizeBase: '17px',
     borderRadius: '8px',
-    spacingUnit: '4px',
+    spacingUnit: '5px',
   },
   rules: {
     '.Input': {
@@ -71,9 +72,6 @@ interface ShippingAddress {
   is_default: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Inner component — must be a child of <Elements> to use useStripe/useElements
-// ---------------------------------------------------------------------------
 interface CheckoutInnerProps {
   amount: number;
   paymentIntentId: string;
@@ -200,8 +198,6 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
     };
 
     if (paymentIntent?.status === 'succeeded') {
-      // Persist finalizeBody so CheckoutSuccess can call /finalize with retry.
-      // clearCart() lives there — only clears after the order is confirmed in DB.
       sessionStorage.setItem('pending_finalize', JSON.stringify(finalizeBody));
       navigate('/checkout/success');
       return;
@@ -240,12 +236,11 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
     setIsProcessing(false);
   };
 
-  // ── Multibanco reference screen ──────────────────────────────────────────
   if (paymentReference) {
     return (
       <div className="min-h-screen bg-gray-50">
         <SEO title="Pedido Criado com Sucesso" description="O seu pedido foi criado com sucesso" canonical="/checkout" ogType="website" />
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
@@ -291,7 +286,6 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
     );
   }
 
-  // ── Main checkout layout ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
       <SEO
@@ -300,7 +294,9 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
         canonical="/checkout"
         ogType="website"
       />
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      
+      {/* ALTERAÇÃO CHAVE 1: Uso de max-w-7xl (1280px) ou max-w-[1400px] para ocupar muito mais ecrã sem quebrar a leitura */}
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-16 py-8 lg:py-12">
         <div className="flex items-center gap-4 mb-8">
           <Link to="/carrinho" className="flex items-center gap-2 text-primary-600 hover:text-primary-700">
             <ArrowLeft className="h-4 w-4" />
@@ -310,7 +306,6 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
 
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Finalizar Compra</h1>
 
-        {/* Guest Warning */}
         {showGuestWarning && !isAuthenticated && (
           <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 shadow-sm">
             <div className="flex items-start gap-4">
@@ -332,32 +327,32 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* ALTERAÇÃO CHAVE 2: xl:gap-16 para gerir o espaço entre blocos perfeitamente em ecrãs grandes */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 xl:gap-16 items-start">
 
             {/* ── Left: address form ─────────────────────────────────────── */}
-            <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
+            <div className="bg-white rounded-lg shadow-sm p-6 sm:p-8 space-y-8 lg:col-span-7">
 
-              {/* Saved addresses */}
               {isAuthenticated && savedAddresses.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Moradas Guardadas</h3>
-                  <div className="space-y-2 mb-4">
+                  <div className="space-y-3 mb-4">
                     {savedAddresses.map((addr) => (
                       <label
                         key={addr.id}
-                        className={`flex items-start p-4 border rounded-md cursor-pointer transition-colors ${selectedAddressId === addr.id ? 'border-primary-600 bg-primary-50' : 'border-gray-300 hover:bg-gray-50'}`}
+                        className={`flex items-start p-5 border rounded-lg cursor-pointer transition-colors ${selectedAddressId === addr.id ? 'border-primary-600 bg-primary-50' : 'border-gray-300 hover:bg-gray-50'}`}
                       >
                         <input type="radio" name="address" checked={selectedAddressId === addr.id}
                           onChange={() => { setSelectedAddressId(addr.id); selectAddress(addr); }}
-                          className="mt-1 mr-3" />
+                          className="mt-1 mr-4" />
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{addr.name}</span>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-gray-900">{addr.name}</span>
                             {addr.is_default && <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded">Predefinida</span>}
                           </div>
-                          <p className="text-sm text-gray-600">{addr.address}</p>
-                          <p className="text-sm text-gray-600">{addr.postal_code} {addr.city}</p>
-                          <p className="text-sm text-gray-600">{addr.phone}</p>
+                          <p className="text-sm text-gray-600 leading-relaxed">{addr.address}</p>
+                          <p className="text-sm text-gray-600 leading-relaxed">{addr.postal_code} {addr.city}</p>
+                          <p className="text-sm text-gray-600 leading-relaxed">{addr.phone}</p>
                         </div>
                       </label>
                     ))}
@@ -370,69 +365,67 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
                 </div>
               )}
 
-              {/* Personal info + address fields */}
               {(showNewAddressForm || savedAddresses.length === 0) && (
                 <>
                   <div>
-                    <h3 className="text-lg font-semibold mb-4">Informações Pessoais</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <h3 className="text-lg font-semibold mb-5">Informações Pessoais</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Nome Completo *</label>
                         <input type="text" required value={customerInfo.name}
                           onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500" />
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500" />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Email *</label>
                         <input type="email" required value={customerInfo.email}
                           onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
                           onBlur={(e) => {
-                            // Capture email early for abandoned cart recovery
                             if (e.target.value) {
                               const prev = JSON.parse(localStorage.getItem('guest_checkout_data') || '{}');
                               localStorage.setItem('guest_checkout_data', JSON.stringify({ ...prev, email: e.target.value }));
                             }
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500" />
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500" />
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Telefone *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Telefone *</label>
                         <input type="tel" required value={customerInfo.phone}
                           onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
                           placeholder="919626697"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500" />
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500" />
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold mb-4">Endereço de Entrega</h3>
-                    <div className="space-y-4">
+                    <h3 className="text-lg font-semibold mb-5">Endereço de Entrega</h3>
+                    <div className="space-y-5">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Endereço *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Endereço *</label>
                         <input type="text" required value={customerInfo.address}
                           onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500" />
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500" />
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Cidade *</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Cidade *</label>
                           <input type="text" required value={customerInfo.city}
                             onChange={(e) => setCustomerInfo({ ...customerInfo, city: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500" />
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500" />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Código Postal *</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Código Postal *</label>
                           <input type="text" required value={customerInfo.postalCode}
                             onChange={(e) => setCustomerInfo({ ...customerInfo, postalCode: e.target.value })}
                             placeholder="1234-567"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500" />
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500" />
                         </div>
                       </div>
                     </div>
 
                     {isAuthenticated && showNewAddressForm && (
-                      <div className="mt-4">
+                      <div className="mt-6">
                         <label className="flex items-center">
                           <input type="checkbox" checked={saveAddress} onChange={(e) => setSaveAddress(e.target.checked)}
                             className="w-4 h-4 text-primary-600 bg-gray-50 border-gray-300 rounded focus:ring-primary-500 cursor-pointer" />
@@ -446,54 +439,58 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
             </div>
 
             {/* ── Right: order summary + payment ─────────────────────────── */}
-            <div className="space-y-6">
-              {/* Order summary */}
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold mb-4">Resumo do Pedido</h3>
-                <div className="space-y-3 mb-6">
+            <div className="space-y-6 lg:col-span-5 sticky top-8">
+              <div className="bg-white rounded-lg shadow-sm p-6 sm:p-8">
+                <h3 className="text-lg font-semibold mb-5">Resumo do Pedido</h3>
+                <div className="space-y-4 mb-6">
                   {items.map((item) => (
-                    <div key={item.product.id} className="flex justify-between">
-                      <div className="flex-1">
-                        <p className="font-medium">{item.product.name}</p>
-                        {item.selectedColor && <p className="text-sm text-gray-600">Cor: {item.selectedColor}</p>}
-                        <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                    <div key={item.product.id} className="flex items-center gap-3">
+                      <img
+                        src={getAbsoluteImageUrl(
+                          (item.product.images?.[0] ?? '').replace(/(-md|-sm)?(\.webp)$/, '-sm$2') || '/images/placeholder.jpg'
+                        )}
+                        alt={item.product.name}
+                        className="w-16 h-16 object-cover rounded-lg shrink-0 bg-gray-100"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{item.product.name}</p>
+                        {item.selectedColor && <p className="text-sm text-gray-500">Cor: {item.selectedColor}</p>}
+                        <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                       </div>
-                      <span className="font-medium">{(item.product.price * item.quantity).toFixed(2)}€</span>
+                      <span className="font-medium text-gray-900 shrink-0">{(item.product.price * item.quantity).toFixed(2)}€</span>
                     </div>
                   ))}
                 </div>
-                <div className="border-t pt-4 space-y-2 text-sm">
+                <div className="border-t border-gray-100 pt-5 space-y-3 text-sm text-gray-600">
                   <div className="flex justify-between">
                     <span>Subtotal (s/ IVA)</span>
-                    <span>{subtotalExVat.toFixed(2)}€</span>
+                    <span className="font-medium text-gray-900">{subtotalExVat.toFixed(2)}€</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Envio</span>
-                    <span className="text-green-600">Grátis</span>
+                    <span className="text-green-600 font-medium">Grátis</span>
                   </div>
                   <div className="flex justify-between">
                     <span>IVA (23%)</span>
-                    <span>{ivaAmount.toFixed(2)}€</span>
+                    <span className="font-medium text-gray-900">{ivaAmount.toFixed(2)}€</span>
                   </div>
-                  <div className="flex justify-between text-lg font-bold border-t pt-2">
+                  <div className="flex justify-between text-lg font-bold border-t border-gray-100 pt-3 mt-2 text-gray-900">
                     <span>Total (c/ IVA)</span>
                     <span className="text-primary-600">{amount.toFixed(2)}€</span>
                   </div>
                 </div>
               </div>
 
-              {/* Payment */}
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <Lock className="h-4 w-4 text-gray-400" />
+              <div className="bg-white rounded-lg shadow-sm p-6 sm:p-8">
+                <h3 className="text-lg font-semibold mb-5 flex items-center gap-2">
+                  <Lock className="h-5 w-5 text-gray-400" />
                   Pagamento Seguro
                 </h3>
 
-                {/* Loading skeleton */}
                 {!isPaymentReady && (
-                  <div className="animate-pulse space-y-3 mb-4">
-                    <div className="h-11 bg-gray-100 rounded-lg" />
-                    <div className="h-11 bg-gray-100 rounded-lg" />
+                  <div className="animate-pulse space-y-4 mb-5">
+                    <div className="h-12 bg-gray-100 rounded-lg" />
+                    <div className="h-12 bg-gray-100 rounded-lg" />
                   </div>
                 )}
 
@@ -505,16 +502,16 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
                 </div>
 
                 {payError && (
-                  <div className="mt-3 flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5">
-                    <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
-                    <p className="text-red-700 text-sm">{payError}</p>
+                  <div className="mt-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                    <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+                    <p className="text-red-700 text-sm leading-relaxed">{payError}</p>
                   </div>
                 )}
 
                 <button
                   type="submit"
                   disabled={!stripe || isProcessing || !isPaymentReady}
-                  className="w-full mt-4 bg-primary-600 text-white py-3 px-6 rounded-md hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-semibold flex items-center justify-center gap-2"
+                  className="w-full mt-6 bg-primary-600 text-white py-3.5 px-6 rounded-lg hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-semibold flex items-center justify-center gap-2 text-[15px]"
                 >
                   {isProcessing && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                   {isProcessing ? 'A processar...' : `Pagar ${amount.toFixed(2)} €`}
@@ -535,9 +532,6 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
   );
 };
 
-// ---------------------------------------------------------------------------
-// Outer component — creates PaymentIntent on mount, then renders <Elements>
-// ---------------------------------------------------------------------------
 const Checkout: React.FC = () => {
   const { items } = useCart();
   const { user } = useAuth();
@@ -549,12 +543,9 @@ const Checkout: React.FC = () => {
   const API_BASE_URL = '/api';
 
   useEffect(() => {
-    // Wait until cart is hydrated from localStorage. Once created, don't recreate.
     if (items.length === 0 || intentCreated.current) return;
     intentCreated.current = true;
 
-    // Cache PI in sessionStorage to avoid creating a new one on every refresh.
-    // Key is a fingerprint of the cart contents; TTL is 30 minutes.
     const PI_TTL = 30 * 60 * 1000;
     const cartKey = `checkout_pi_${items.map(i => `${i.product.id}x${i.quantity}`).join('_')}`;
     const cached = sessionStorage.getItem(cartKey);
@@ -567,7 +558,7 @@ const Checkout: React.FC = () => {
           setPaymentIntentId(paymentIntentId);
           return;
         }
-      } catch { /* corrupted cache — fall through to create new */ }
+      } catch { /* fall through */ }
     }
 
     fetch(`${API_BASE_URL}/payment/create-intent`, {
