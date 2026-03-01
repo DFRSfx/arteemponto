@@ -113,12 +113,12 @@ const Shop: React.FC = () => {
   };
 
   const pageTitle = selectedCategory
-    ? `${selectedCategory} - Loja de Crochê`
-    : 'Loja - Produtos em Crochê';
+    ? `${selectedCategory} em Croché Artesanal Feito à Mão`
+    : 'Loja — Malas de Croché e Acessórios Artesanais Feitos à Mão em Portugal';
 
   const pageDescription = selectedCategory
-    ? `Descubra nossa coleção de ${selectedCategory.toLowerCase()} em crochê. Peças únicas feitas à mão com qualidade superior.`
-    : 'Explore nossa loja online de produtos em crochê. Bolsas, roupas, acessórios e decoração feitos à mão com amor e dedicação.';
+    ? `Descubra a nossa coleção de ${selectedCategory.toLowerCase()} em croché artesanal feito à mão em Portugal. Peças únicas, de qualidade premium — perfeitas para oferecer.`
+    : 'Explore a nossa loja online de malas de croché feitas à mão em Portugal. Acessórios de croché artesanais para oferecer, decoração de sala em croché artesanal e bolsas de croché personalizadas por encomenda.';
 
   const loadMore = () => {
     setDisplayCount(prev => prev + PRODUCTS_PER_LOAD);

@@ -1,7 +1,7 @@
 {
-  "name": "Arte em Ponto - Crochê Feito à Mão",
+  "name": "Arte em Ponto — Croché Feito à Mão",
   "short_name": "Arte em Ponto",
-  "description": "Loja online de produtos em crochê. Peças únicas feitas com amor e dedicação.",
+  "description": "Loja online de malas de croché feitas à mão em Portugal. Peças únicas, prendas artesanais e decoração em croché artesanal.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",
@@ -12,19 +12,13 @@
       "src": "/icon.svg",
       "type": "image/svg+xml",
       "sizes": "any",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "maskable"
-    },
-    {
-      "src": "/icon-512.png",
-      "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "any"
     }
   ],
   "categories": ["shopping", "lifestyle"],

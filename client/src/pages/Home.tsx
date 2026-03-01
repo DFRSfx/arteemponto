@@ -1,36 +1,63 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Star, Heart, Shield, Grid2x2, Maximize2 } from 'lucide-react';
+import { ArrowRight, Star, Heart, Shield, Grid2x2, Maximize2, ChevronDown } from 'lucide-react';
 import SEO from '../components/SEO';
 import HeroSlider from '../components/HeroSlider';
 import ProductCard from '../components/ProductCard';
 import { useProducts } from '../hooks/useProducts';
-import { getOrganizationSchema, getWebSiteSchema } from '../utils/schemas';
+import { getOrganizationSchema, getWebSiteSchema, getFAQSchema, getHomepageFAQs } from '../utils/schemas';
+
+const faqs = getHomepageFAQs();
 
 const Home: React.FC = () => {
   const { products, loading, error } = useProducts();
   const [featuredViewMode, setFeaturedViewMode] = useState<'grid' | 'fullscreen'>('grid');
   const [newViewMode, setNewViewMode] = useState<'grid' | 'fullscreen'>('grid');
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
   const featuredProducts = products.filter(product => product.featured).slice(0, 4);
   const newProducts = products.filter(product => product.new).slice(0, 4);
 
-  // Combine Organization and WebSite schemas
   const schemas = {
     '@context': 'https://schema.org',
-    '@graph': [getOrganizationSchema(), getWebSiteSchema()],
+    '@graph': [
+      getOrganizationSchema(),
+      getWebSiteSchema(),
+      getFAQSchema(faqs),
+    ],
   };
 
   return (
     <div className="min-h-screen">
       <SEO
-        title="Crochê Feito à Mão"
-        description="Loja online de produtos em crochê. Peças únicas feitas com amor e dedicação. Descubra bolsas, roupas, acessórios e decoração em crochê de alta qualidade."
+        title="Malas de Croché Feitas à Mão em Portugal"
+        description="Loja online de malas de croché feitas à mão em Portugal. Prendas artesanais para mulher, acessórios de croché artesanais para oferecer e decoração de sala em croché artesanal. Peças únicas com qualidade premium."
         canonical="/"
         ogType="website"
         schema={schemas}
       />
+
       {/* Hero Slider */}
       <HeroSlider />
+
+      {/* Keyword-rich intro — visible text for Google + user trust */}
+      <section className="py-10 bg-white border-b border-gray-100">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
+          <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
+            Na <strong>Arte em Ponto</strong>, cada{' '}
+            <strong>mala de croché feita à mão em Portugal</strong> leva entre{' '}
+            <strong>8 a 15 horas de trabalho artesanal</strong> — um detalhe que
+            não encontra em produções em série. Criamos{' '}
+            <strong>prendas artesanais para mulher feitas à mão</strong>,{' '}
+            <strong>acessórios de croché artesanais para oferecer</strong> e{' '}
+            <strong>decoração de sala em croché artesanal</strong> que transforma
+            qualquer espaço com autenticidade portuguesa. Também aceitamos{' '}
+            <Link to="/contacto" className="text-primary-600 hover:underline font-medium">
+              bolsas de croché personalizadas por encomenda
+            </Link>
+            .
+          </p>
+        </div>
+      </section>
 
       {/* Featured Products */}
       <section className="py-16">
@@ -275,7 +302,7 @@ const Home: React.FC = () => {
             Pronto para Descobrir?
           </h2>
           <p className="text-xl text-primary-100 mb-8">
-            Explore a nossa coleção completa de produtos de crochê
+            Explore a nossa coleção completa de produtos de croché artesanais feitos à mão em Portugal
           </p>
           <Link
             to="/loja"
@@ -284,6 +311,44 @@ const Home: React.FC = () => {
             Explorar Loja
             <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
           </Link>
+        </div>
+      </section>
+
+      {/* FAQ Section — targets "People Also Ask" queries + FAQ rich result */}
+      <section className="py-16 bg-white">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
+              Perguntas Frequentes
+            </h2>
+            <p className="text-gray-600">
+              Tudo o que precisa de saber sobre os nossos produtos artesanais
+            </p>
+          </div>
+
+          <div className="divide-y divide-gray-200 border border-gray-200 rounded-xl overflow-hidden">
+            {faqs.map((faq, index) => (
+              <div key={index} className="bg-white">
+                <button
+                  onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                  aria-expanded={openFaq === index}
+                  className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-gray-50 transition-colors"
+                >
+                  <span className="font-medium text-gray-900 pr-4">{faq.question}</span>
+                  <ChevronDown
+                    className={`h-5 w-5 text-primary-600 flex-shrink-0 transition-transform duration-200 ${
+                      openFaq === index ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+                {openFaq === index && (
+                  <div className="px-6 pb-5">
+                    <p className="text-gray-700 leading-relaxed">{faq.answer}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     </div>

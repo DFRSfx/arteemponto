@@ -283,8 +283,8 @@ const Product: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <SEO
-        title={product.name}
-        description={`${product.description} - Produto em crochê feito à mão. ${product.inStock ? 'Em stock' : 'Indisponível'}. Preço: €${product.price.toFixed(2)}`}
+        title={`${product.name} — Croché Artesanal Feito à Mão em Portugal`}
+        description={`${product.description.slice(0, 120)} — ${product.category} em croché artesanal feito à mão em Portugal. ${product.inStock ? 'Em stock' : 'Indisponível'}. €${product.price.toFixed(2)}.`}
         canonical={`/produto/${product.id}`}
         ogType="product"
         ogImage={product.images[0]}

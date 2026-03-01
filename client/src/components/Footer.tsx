@@ -18,12 +18,14 @@ const Footer: React.FC = () => {
                 href="https://www.instagram.com/arteemponto.croche/"
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Instagram da Arte em Ponto"
                 className="p-2 bg-primary-700 rounded-full hover:bg-primary-600 transition-colors"
               >
                 <Instagram className="h-5 w-5" />
               </a>
               <a
                 href="mailto:arteemponto1972@gmail.com"
+                aria-label="Enviar email para Arte em Ponto"
                 className="p-2 bg-primary-700 rounded-full hover:bg-primary-600 transition-colors"
               >
                 <Mail className="h-5 w-5" />

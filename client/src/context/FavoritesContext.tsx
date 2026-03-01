@@ -68,7 +68,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Favorites loaded:', data.favorites);
         setFavorites(data.favorites || []);
         // Also save to localStorage as backup
         localStorage.setItem('favorites', JSON.stringify(data.favorites || []));
@@ -114,16 +113,17 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Load favorites on mount and when auth changes
-  useEffect(() => {
-    loadFavoritesFromDB();
-  }, [isAuthenticated, token]);
-
-  // Sync favorites when user logs in
+  // Load favorites on mount and when auth changes.
+  // If authenticated, sync (merge session favorites) then load.
+  // If not, just load. Single effect prevents the double-fetch that
+  // occurs when two effects share the same dependency array.
   useEffect(() => {
     if (isAuthenticated && token) {
       syncFavorites();
+    } else {
+      loadFavoritesFromDB();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, token]);
 
   const addToFavorites = async (productId: string) => {

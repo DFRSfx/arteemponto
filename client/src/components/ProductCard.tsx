@@ -157,12 +157,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
             <>
               <button
                 onClick={handlePrevImage}
+                aria-label="Imagem anterior"
                 className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-white/90 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white z-10"
               >
                 <ChevronLeft className="h-5 w-5 text-gray-800" />
               </button>
               <button
                 onClick={handleNextImage}
+                aria-label="Próxima imagem"
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white/90 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white z-10"
               >
                 <ChevronRight className="h-5 w-5 text-gray-800" />
@@ -190,7 +192,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
               </span>
             )}
             {product.featured && (
-              <span className="bg-tertiary-500 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
+              <span className="bg-tertiary-700 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
                 Destaque
               </span>
             )}
@@ -199,11 +201,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
           {/* Action buttons */}
           {!hideActions && (
             <div className="absolute top-4 right-4 flex flex-col gap-2">
-              <button 
+              <button
                 onClick={handleToggleFavorite}
+                aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
                 className={`p-3 rounded-full shadow-lg hover:scale-110 transition-all duration-300 ${
-                  isFavorite 
-                    ? 'bg-primary-600 text-white' 
+                  isFavorite
+                    ? 'bg-primary-600 text-white'
                     : 'bg-white text-gray-600 hover:bg-primary-600 hover:text-white'
                 }`}
               >
@@ -309,12 +312,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
             <>
               <button
                 onClick={handlePrevImage}
+                aria-label="Imagem anterior"
                 className="absolute left-1 top-1/2 -translate-y-1/2 p-1.5 bg-white/90 rounded-full shadow-md opacity-0 group-hover/image:opacity-100 transition-opacity hover:bg-white z-10"
               >
                 <ChevronLeft className="h-4 w-4 text-gray-800" />
               </button>
               <button
                 onClick={handleNextImage}
+                aria-label="Próxima imagem"
                 className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-white/90 rounded-full shadow-md opacity-0 group-hover/image:opacity-100 transition-opacity hover:bg-white z-10"
               >
                 <ChevronRight className="h-4 w-4 text-gray-800" />
@@ -352,7 +357,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
                   </span>
                 )}
                 {product.featured && (
-                  <span className="bg-tertiary-500 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
+                  <span className="bg-tertiary-700 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
                     Destaque
                   </span>
                 )}
@@ -389,8 +394,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
             </span>
 
             <div className="flex items-center gap-3">
-              <button 
+              <button
                 onClick={handleToggleFavorite}
+                aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
                 className={`p-2 border rounded-full transition-colors ${
                   isFavorite
                     ? 'border-primary-600 bg-primary-50 text-primary-600'
@@ -458,12 +464,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
           <>
             <button
               onClick={handlePrevImage}
+              aria-label="Imagem anterior"
               className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-white/90 rounded-full shadow-md opacity-0 group-hover/image:opacity-100 transition-opacity hover:bg-white z-10"
             >
               <ChevronLeft className="h-4 w-4 text-gray-800" />
             </button>
             <button
               onClick={handleNextImage}
+              aria-label="Próxima imagem"
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-white/90 rounded-full shadow-md opacity-0 group-hover/image:opacity-100 transition-opacity hover:bg-white z-10"
             >
               <ChevronRight className="h-4 w-4 text-gray-800" />
@@ -492,7 +500,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
           </span>
         )}
         {product.featured && (
-          <span className="bg-tertiary-500 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
+          <span className="bg-tertiary-700 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
             Destaque
           </span>
         )}
@@ -501,11 +509,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
       {/* Action buttons */}
       {!hideActions && (
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col gap-2 z-20">
-          <button 
+          <button
             onClick={handleToggleFavorite}
+            aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
             className={`p-2 rounded-full shadow-md hover:scale-110 transition-all duration-300 ${
-              isFavorite 
-                ? 'bg-primary-600 text-white' 
+              isFavorite
+                ? 'bg-primary-600 text-white'
                 : 'bg-white text-gray-600 hover:bg-primary-600 hover:text-white'
             }`}
           >

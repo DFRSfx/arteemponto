@@ -16,9 +16,9 @@ const __dirname = path.dirname(__filename);
 const heroSlidesDir = path.join(__dirname, '../../public/hero-slides');
 
 const HERO_VARIANTS = [
-  { variant: 'lg', suffix: '',    width: 1920, height: 1080 },
-  { variant: 'md', suffix: '-md', width: 1280, height: 720  },
-  { variant: 'sm', suffix: '-sm', width: 800,  height: 450  },
+  { variant: 'lg', suffix: '',    width: 1920, height: 1080, quality: 85 },
+  { variant: 'md', suffix: '-md', width: 1280, height: 720,  quality: 75 },
+  { variant: 'sm', suffix: '-sm', width: 800,  height: 450,  quality: 68 },
 ] as const;
 
 function getSlidePath(id: number | string, suffix: string = ''): string {
@@ -38,10 +38,10 @@ async function saveSlideImages(id: number | string, buffer: Buffer): Promise<voi
   fs.mkdirSync(heroSlidesDir, { recursive: true });
   const opts = { effort: 6, smartSubsample: true };
   await Promise.all(
-    HERO_VARIANTS.map(({ suffix, width, height }) =>
+    HERO_VARIANTS.map(({ suffix, width, height, quality }) =>
       sharp(buffer)
         .resize(width, height, { fit: 'cover', position: 'center' })
-        .webp({ quality: 85, ...opts })
+        .webp({ quality, ...opts })
         .toFile(getSlidePath(id, suffix))
     )
   );

@@ -1,28 +1,67 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, LogIn, X } from 'lucide-react';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import SEO from '../components/SEO';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import AuthModal from '../components/AuthModal';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+// Retry helper with exponential backoff (1s → 2s → 4s)
+async function finalizeWithRetry(body: object, attempts = 3): Promise<{ id?: number; tracking_token?: string } | null> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch('/api/payment/finalize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) return res.json();
+    } catch { /* network error — retry */ }
+    if (i < attempts - 1) await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+  }
+  return null; // All retries failed — webhook will handle it
+}
 
 const CheckoutSuccess: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
+  const urlToken = searchParams.get('token');
   const { isAuthenticated } = useAuth();
+  const { clearCart } = useCart();
   const navigate = useNavigate();
 
   const [orderId, setOrderId] = useState<number | null>(null);
+  const [trackingToken, setTrackingToken] = useState<string | null>(urlToken);
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  // Validate the token and fetch the order number
   useEffect(() => {
-    if (!token) return;
-    fetch(`/api/orders/track/${token}`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => { if (data?.id) setOrderId(data.id); })
-      .catch(() => {});
-  }, [token]);
+    const pending = sessionStorage.getItem('pending_finalize');
+
+    if (pending) {
+      // New flow: payment confirmed on frontend, finalize + clearCart here
+      sessionStorage.removeItem('pending_finalize');
+
+      finalizeWithRetry(JSON.parse(pending)).then(order => {
+        clearCart();
+        if (order?.tracking_token) setTrackingToken(order.tracking_token);
+        if (order?.id) setOrderId(order.id);
+        // If all retries failed, the webhook will create the order.
+        // Cart is still cleared — the payment went through.
+      });
+      return;
+    }
+
+    // Legacy flow: token comes from URL (redirect from Stripe or old code path)
+    if (urlToken) {
+      fetch(`/api/orders/track/${urlToken}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => { if (data?.id) setOrderId(data.id); })
+        .catch(() => {});
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleVerEncomendas = () => {
     if (isAuthenticated) {
@@ -61,6 +100,12 @@ const CheckoutSuccess: React.FC = () => {
             </div>
           )}
 
+          {!orderId && (
+            <div className="bg-gray-50 rounded-lg p-6 mb-6">
+              <p className="text-sm text-gray-600">A sua encomenda está a ser processada...</p>
+            </div>
+          )}
+
           <div className="text-sm text-gray-600 mb-8">
             <p>Pagamento confirmado</p>
             <p>Receberá um email de confirmação em breve</p>
@@ -81,10 +126,18 @@ const CheckoutSuccess: React.FC = () => {
               Ver Encomendas
             </button>
           </div>
+
+          {trackingToken && (
+            <p className="text-xs text-gray-400 mt-6">
+              <Link to={`/track-order/${trackingToken}`} className="underline hover:text-gray-600">
+                Acompanhar encomenda
+              </Link>
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Guest modal — shown when unauthenticated user clicks "Ver Encomendas" */}
+      {/* Guest modal */}
       {showGuestModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -118,12 +171,11 @@ const CheckoutSuccess: React.FC = () => {
         </div>
       )}
 
-      {/* Auth modal */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        initialMode="login"
-      />
+      {showAuthModal && (
+        <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+          <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} initialMode="login" />
+        </GoogleOAuthProvider>
+      )}
     </div>
   );
 };

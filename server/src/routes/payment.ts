@@ -91,6 +91,54 @@ async function createOrderFromData(
 }
 
 // ---------------------------------------------------------------------------
+// POST /api/payment/create-intent
+// Lightweight: only needs items. Address is collected later at /finalize.
+// ---------------------------------------------------------------------------
+router.post(
+  '/create-intent',
+  [
+    body('items').isArray({ min: 1 }).withMessage('Items are required'),
+    body('items.*.product_id').isInt().withMessage('Product ID must be an integer'),
+    body('items.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
+    body('items.*.price').isFloat({ min: 0 }).withMessage('Price must be positive'),
+  ],
+  async (req: any, res: any) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      const { items, user_id } = req.body;
+      const subtotal = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+      const total = parseFloat(subtotal.toFixed(2));
+
+      if (total <= 0) {
+        res.status(400).json({ error: 'Invalid order total' });
+        return;
+      }
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(total * 100),
+        currency: 'eur',
+        automatic_payment_methods: { enabled: true },
+      });
+
+      await pool.execute(
+        'INSERT INTO pending_checkouts (payment_intent_id, data) VALUES (?, ?)',
+        [paymentIntent.id, JSON.stringify({ items, total, user_id: user_id || null, payment_method: 'stripe' })]
+      );
+
+      res.json({ success: true, clientSecret: paymentIntent.client_secret, paymentIntentId: paymentIntent.id, amount: total });
+    } catch (error: any) {
+      console.error('Error creating payment intent:', error);
+      res.status(500).json({ error: error.message || 'Failed to create payment intent' });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
 // POST /api/payment/initialize
 // Creates a PaymentIntent and stores checkout data — NO order is created yet.
 // ---------------------------------------------------------------------------
@@ -103,7 +151,6 @@ router.post(
     body('customer_address').trim().notEmpty().withMessage('Address is required'),
     body('customer_city').trim().notEmpty().withMessage('City is required'),
     body('customer_postal_code').trim().notEmpty().withMessage('Postal code is required'),
-    body('payment_method').trim().notEmpty().withMessage('Payment method is required'),
     body('items').isArray({ min: 1 }).withMessage('Items are required'),
     body('items.*.product_id').isInt().withMessage('Product ID must be an integer'),
     body('items.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
@@ -120,7 +167,7 @@ router.post(
       const {
         customer_name, customer_email, customer_phone,
         customer_address, customer_city, customer_postal_code,
-        payment_method, items, user_id, save_address
+        items, user_id, save_address
       } = req.body;
 
       // item.price already includes IVA — no multiplication needed
@@ -132,18 +179,11 @@ router.post(
         return;
       }
 
-      const methodTypeMap: Record<string, string[]> = {
-        card: ['card'], googlepay: ['card'], applepay: ['card'],
-        mbway: ['mb_way'], multibanco: ['multibanco'],
-      };
-      const stripeTypes = methodTypeMap[payment_method] || ['card'];
-
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(total * 100),
         currency: 'eur',
-        payment_method_types: stripeTypes,
-        metadata: { payment_method }
-      } as any);
+        automatic_payment_methods: { enabled: true },
+      });
 
       await pool.execute(
         'INSERT INTO pending_checkouts (payment_intent_id, data) VALUES (?, ?)',
@@ -152,14 +192,14 @@ router.post(
           JSON.stringify({
             customer_name, customer_email, customer_phone,
             customer_address, customer_city, customer_postal_code,
-            payment_method, items, total,
+            payment_method: 'stripe', items, total,
             user_id: user_id || null,
             save_address: save_address || false
           })
         ]
       );
 
-      console.log(`💳 PI ${paymentIntent.id} created for ${customer_email} (${payment_method}) — ${total}€`);
+      console.log(`💳 PI ${paymentIntent.id} created for ${customer_email} — ${total}€`);
 
       res.json({
         success: true,
@@ -210,7 +250,18 @@ router.post(
         return;
       }
 
-      const checkoutData = JSON.parse(pendingRows[0].data);
+      const pendingData = JSON.parse(pendingRows[0].data);
+      // Merge address fields from request body (new flow) with stored data (old flow)
+      const { customer_name, customer_email, customer_phone,
+              customer_address, customer_city, customer_postal_code,
+              user_id, save_address } = req.body;
+      const checkoutData = {
+        ...pendingData,
+        ...(customer_name && { customer_name, customer_email, customer_phone,
+          customer_address, customer_city, customer_postal_code,
+          user_id: user_id || pendingData.user_id || null,
+          save_address: save_address || false }),
+      };
       const connection = await pool.getConnection();
 
       try {

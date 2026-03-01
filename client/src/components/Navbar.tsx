@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Search, ShoppingCart, Heart, User, LogOut, Package, UserCircle, Settings, Shield } from 'lucide-react';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useCart } from '../context/CartContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +11,8 @@ import { useCategories } from '../hooks/useCategories';
 import { Product } from '../types';
 import AuthModal from './AuthModal';
 import { getAbsoluteImageUrl, imgVariant } from '../utils/imageUtils';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 const Navbar: React.FC = () => {
   const { products, loading: productsLoading } = useProducts();
@@ -276,6 +279,8 @@ const Navbar: React.FC = () => {
                 src="/images/logo.webp"
                 alt="Arte em Ponto"
                 className="h-20 w-auto"
+                width="1472"
+                height="704"
               />
             </div>
           </Link>
@@ -459,14 +464,16 @@ const Navbar: React.FC = () => {
             <button
               ref={searchButtonRef}
               onClick={handleSearchToggle}
+              aria-label={searchOpen ? 'Fechar pesquisa' : 'Pesquisar'}
               className={`md:hidden p-2 transition-colors ${searchOpen ? 'text-primary-600' : 'text-gray-600 hover:text-primary-600'}`}
             >
               <Search className="h-6 w-6" />
             </button>
 
             {/* Heart - Desktop only */}
-            <Link 
+            <Link
               to="/favoritos"
+              aria-label="Favoritos"
               className="hidden md:block p-2 text-gray-600 hover:text-primary-600 transition-colors relative"
             >
               <Heart className="h-6 w-6" />
@@ -479,6 +486,7 @@ const Navbar: React.FC = () => {
 
             <Link
               to="/carrinho"
+              aria-label="Carrinho"
               className="p-2 text-gray-600 hover:text-primary-600 transition-colors relative"
             >
               <ShoppingCart className="h-6 w-6" />
@@ -493,6 +501,7 @@ const Navbar: React.FC = () => {
             <div className="relative hidden md:block">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
+                aria-label="A minha conta"
                 className="p-2 text-gray-600 hover:text-primary-600 transition-colors"
               >
                 <User className="h-6 w-6" />
@@ -502,6 +511,7 @@ const Navbar: React.FC = () => {
             {/* Mobile menu button */}
             <button
               onClick={() => isOpen ? handleCloseMenu() : setIsOpen(true)}
+              aria-label={isOpen ? 'Fechar menu' : 'Abrir menu'}
               className="md:hidden p-2 text-gray-600 hover:text-primary-600 transition-colors"
             >
               {isOpen ? (
@@ -912,12 +922,16 @@ const Navbar: React.FC = () => {
       )}
     </nav>
 
-    {/* Auth Modal */}
-    <AuthModal
-      isOpen={authModalOpen}
-      onClose={() => setAuthModalOpen(false)}
-      initialMode={authMode}
-    />
+    {/* Auth Modal — only mount when open so Google GIS script loads on demand */}
+    {authModalOpen && (
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          initialMode={authMode}
+        />
+      </GoogleOAuthProvider>
+    )}
     </>
   );
 };
