@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const generateSlug = (name: string) =>
   name.toLowerCase()
@@ -32,6 +32,12 @@ export default function CategoriesList() {
     slug: '',
     description: '',
   });
+  const [addFieldErrors, setAddFieldErrors] = useState<Record<string, string>>({});
+  const addNameRef = useRef<HTMLInputElement>(null);
+
+  const clearAddError = (field: string) => {
+    setAddFieldErrors(prev => { const next = { ...prev }; delete next[field]; return next; });
+  };
 
   useEffect(() => {
     loadCategories();
@@ -50,6 +56,18 @@ export default function CategoriesList() {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const errors: Record<string, string> = {};
+    if (!formData.name.trim()) errors.name = 'Campo obrigatório';
+
+    if (Object.keys(errors).length > 0) {
+      setAddFieldErrors(errors);
+      addNameRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      addNameRef.current?.focus();
+      return;
+    }
+    setAddFieldErrors({});
+
     try {
       await categoriesApi.create(formData);
       setShowAddForm(false);
@@ -105,7 +123,7 @@ export default function CategoriesList() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-800">Categorias</h1>
         <button
-          onClick={() => setShowAddForm(!showAddForm)}
+          onClick={() => { setShowAddForm(!showAddForm); setAddFieldErrors({}); }}
           className="bg-amber-600 text-white px-4 py-3 rounded-lg hover:bg-amber-700 active:bg-amber-800 transition-colors flex items-center touch-manipulation min-h-[44px]"
         >
           {showAddForm ? <X size={20} className="mr-2" /> : <Plus size={20} className="mr-2" />}
@@ -117,20 +135,22 @@ export default function CategoriesList() {
       {showAddForm && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Adicionar Nova Categoria</h2>
-          <form onSubmit={handleAdd} className="space-y-4">
+          <form onSubmit={handleAdd} noValidate className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Nome</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nome *</label>
                 <input
+                  ref={addNameRef}
                   type="text"
                   value={formData.name}
                   onChange={(e) => {
                     const name = e.target.value;
                     setFormData(prev => ({ ...prev, name, slug: generateSlug(name) }));
+                    clearAddError('name');
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
-                  required
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none ${addFieldErrors.name ? 'border-red-500' : 'border-gray-300'}`}
                 />
+                {addFieldErrors.name && <p className="mt-1.5 text-sm text-red-500">{addFieldErrors.name}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

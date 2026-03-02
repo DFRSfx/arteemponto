@@ -191,21 +191,14 @@ export default function OrderDetails() {
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Estado da Encomenda</h2>
             <AdminSelect
               value={order.status}
-              onChange={(e) => updateStatus(e.target.value)}
+              onChange={(value) => updateStatus(value)}
               disabled={updating}
               wrapperClassName="w-full"
-              className="py-2"
-            >
-              {statusOptions.map(status => {
-                const labels: Record<string, string> = {
-                  pending: 'Pendente', processing: 'Em processamento',
-                  shipped: 'Enviado', delivered: 'Entregue', cancelled: 'Cancelado'
-                };
-                return (
-                  <option key={status} value={status}>{labels[status] ?? status}</option>
-                );
-              })}
-            </AdminSelect>
+              options={statusOptions.map(status => ({
+                value: status,
+                label: ({ pending: 'Pendente', processing: 'Em processamento', shipped: 'Enviado', delivered: 'Entregue', cancelled: 'Cancelado' } as Record<string, string>)[status] ?? status,
+              }))}
+            />
           </div>
 
           {/* Payment */}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { Lock, ArrowLeft } from 'lucide-react';
@@ -11,11 +11,23 @@ export default function ResetPassword() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const token = searchParams.get('token');
+
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const confirmPasswordRef = useRef<HTMLInputElement>(null);
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors(prev => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!token) {
-      showError('Token de redefiniÁ„o inv·lido');
+      showError('Token de redefini√ß√£o inv√°lido');
       navigate('/');
     }
   }, [token, navigate, showError]);
@@ -24,22 +36,37 @@ export default function ResetPassword() {
     e.preventDefault();
     setError('');
 
-    // Validations
-    if (!password || !confirmPassword) {
-      setError('Por favor, preencha todos os campos');
+    const errors: Record<string, string> = {};
+    if (!password) errors.password = 'Campo obrigat√≥rio';
+    if (!confirmPassword) errors.confirmPassword = 'Campo obrigat√≥rio';
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const refs: Record<string, React.RefObject<HTMLInputElement | null>> = {
+        password: passwordRef,
+        confirmPassword: confirmPasswordRef,
+      };
+      const firstKey = Object.keys(errors)[0];
+      refs[firstKey]?.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      refs[firstKey]?.current?.focus();
       return;
     }
 
     if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres');
+      setFieldErrors({ password: 'A senha deve ter pelo menos 6 caracteres' });
+      passwordRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      passwordRef.current?.focus();
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('As senhas n„o coincidem');
+      setFieldErrors({ confirmPassword: 'As senhas n√£o coincidem' });
+      confirmPasswordRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      confirmPasswordRef.current?.focus();
       return;
     }
 
+    setFieldErrors({});
     setLoading(true);
 
     try {
@@ -57,7 +84,7 @@ export default function ResetPassword() {
         throw new Error(data.error || 'Erro ao redefinir senha');
       }
 
-      success('Senha redefinida com sucesso! Pode agora iniciar sess„o.');
+      success('Senha redefinida com sucesso! Pode agora iniciar sess√£o.');
       setTimeout(() => {
         navigate('/');
       }, 2000);
@@ -97,7 +124,7 @@ export default function ResetPassword() {
           </p>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} noValidate className="space-y-6">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
                 {error}
@@ -109,13 +136,19 @@ export default function ResetPassword() {
                 Nova Senha
               </label>
               <input
+                ref={passwordRef}
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                placeholder="MÌnimo 6 caracteres"
-                required
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  clearFieldError('password');
+                }}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none ${fieldErrors.password ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="M√≠nimo 6 caracteres"
               />
+              {fieldErrors.password && (
+                <p className="mt-1.5 text-sm text-red-500">{fieldErrors.password}</p>
+              )}
             </div>
 
             <div>
@@ -123,13 +156,19 @@ export default function ResetPassword() {
                 Confirmar Senha
               </label>
               <input
+                ref={confirmPasswordRef}
                 type="password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  clearFieldError('confirmPassword');
+                }}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none ${fieldErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'}`}
                 placeholder="Repita a senha"
-                required
               />
+              {fieldErrors.confirmPassword && (
+                <p className="mt-1.5 text-sm text-red-500">{fieldErrors.confirmPassword}</p>
+              )}
             </div>
 
             <button
@@ -143,12 +182,12 @@ export default function ResetPassword() {
 
           {/* Footer */}
           <p className="text-center text-sm text-gray-600 mt-6">
-            J· tem conta?{' '}
+            J√° tem conta?{' '}
             <button
               onClick={() => navigate('/')}
               className="text-primary-600 hover:text-primary-700 font-medium"
             >
-              Iniciar Sess„o
+              Iniciar Sess√£o
             </button>
           </p>
         </div>

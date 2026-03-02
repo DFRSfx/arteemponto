@@ -14,10 +14,12 @@ import { getAbsoluteImageUrl, imgVariant } from '../utils/imageUtils';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
+const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
+
 const Navbar: React.FC = () => {
   const { products, loading: productsLoading } = useProducts();
   const { categories, loading: categoriesLoading } = useCategories();
-  const { user, isAuthenticated, logout, refreshUser } = useAuth();
+  const { user, isAuthenticated, logout, refreshUser, setAuthState } = useAuth();
   const { items, total, addItem, removeItem, updateQuantity, clearCart, itemCount } = useCart();
   const { favorites } = useFavorites();
   const { success, info } = useToast();
@@ -68,6 +70,44 @@ const Navbar: React.FC = () => {
       refreshUser();
     }
   }, [isAuthenticated]);
+
+  // Handle Google OAuth redirect callback (runs on mount, before AuthModal is even open)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    if (!code) return;
+
+    const processedCode = sessionStorage.getItem('google_oauth_processed_code');
+    if (processedCode === code) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    sessionStorage.setItem('google_oauth_processed_code', code);
+
+    const processCode = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/google/callback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, redirect_uri: window.location.origin }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Erro ao fazer login com Google');
+        }
+        const data = await res.json();
+        setAuthState(data.token, data.user);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        success('Bem-vindo! Login efetuado com sucesso 🎉');
+      } catch {
+        sessionStorage.removeItem('google_oauth_processed_code');
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    };
+
+    processCode();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [isOpen, setIsOpen] = useState(false);
   const [isMenuClosing, setIsMenuClosing] = useState(false);
@@ -414,6 +454,7 @@ const Navbar: React.FC = () => {
             <div className="relative w-full">
               <input
                 type="text"
+                name="search"
                 placeholder="Procurar produtos..."
                 value={searchQuery}
                 onChange={(e) => {
@@ -529,6 +570,7 @@ const Navbar: React.FC = () => {
             <div className="relative" ref={searchRef}>
               <input
                 type="text"
+                name="search"
                 placeholder="Procurar produtos..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -905,7 +947,7 @@ const Navbar: React.FC = () => {
                     <button
                       onClick={() => {
                         logout();
-                        info('Sessão terminada. Até breve! 👋');
+                        info('Sessão terminada. Até breve!');
                         handleCloseUserMenu();
                       }}
                       className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors font-medium"

@@ -115,15 +115,9 @@ export default function ProductsList() {
           </div>
           <AdminSelect
             value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="py-2"
-          >
-            {categories.map(cat => (
-              <option key={cat} value={cat}>
-                {cat === 'all' ? 'Todas as Categorias' : cat}
-              </option>
-            ))}
-          </AdminSelect>
+            onChange={(value) => setSelectedCategory(value)}
+            options={categories.map(cat => ({ value: cat, label: cat === 'all' ? 'Todas as Categorias' : cat }))}
+          />
         </div>
       </div>
 

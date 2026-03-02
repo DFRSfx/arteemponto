@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, forwardRef } from 'react';
 import { Eye, EyeOff, LucideIcon } from 'lucide-react';
 
 interface FloatingLabelInputProps {
@@ -14,7 +14,7 @@ interface FloatingLabelInputProps {
   icon?: LucideIcon;
 }
 
-const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
+const FloatingLabelInput = forwardRef<HTMLInputElement, FloatingLabelInputProps>(({
   id,
   name,
   type = 'text',
@@ -25,7 +25,7 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
   autoComplete = 'off',
   disabled = false,
   icon: Icon,
-}) => {
+}, ref) => {
   const [isFocused, setIsFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -46,7 +46,7 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
       >
         {label} {required && '*'}
       </label>
-      
+
       {Icon && (
         <Icon
           className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 transition-colors ${
@@ -56,6 +56,7 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
       )}
 
       <input
+        ref={ref}
         id={id}
         name={name}
         type={inputType}
@@ -85,6 +86,8 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
       )}
     </div>
   );
-};
+});
+
+FloatingLabelInput.displayName = 'FloatingLabelInput';
 
 export default FloatingLabelInput;

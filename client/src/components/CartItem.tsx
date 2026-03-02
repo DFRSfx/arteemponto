@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Minus, Plus, X } from 'lucide-react';
 import { CartItem as CartItemType } from '../types';
 import { useCart } from '../context/CartContext';
@@ -25,22 +26,24 @@ const CartItem: React.FC<CartItemProps> = ({ item, onNotify }) => {
     <div className="p-4 sm:p-6 border-b border-gray-200 last:border-b-0">
       <div className="flex gap-3 sm:gap-4">
         {/* Product Image */}
-        <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 overflow-hidden rounded-lg">
+        <Link to={`/produto/${item.product.id}`} className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 overflow-hidden rounded-lg hover:opacity-90 transition-opacity">
           <img
             src={getAbsoluteImageUrl(imgVariant(item.product.images[0], 'sm'))}
             alt={item.product.name}
             className="w-full h-full object-cover"
           />
-        </div>
+        </Link>
 
         {/* Product Info & Actions */}
         <div className="flex-1 min-w-0 flex flex-col">
           {/* Header: Name + Remove Button */}
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="flex-1 min-w-0">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 line-clamp-2">
-                {item.product.name}
-              </h3>
+              <Link to={`/produto/${item.product.id}`} className="group/name">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 group-hover/name:text-primary-600 transition-colors line-clamp-2">
+                  {item.product.name}
+                </h3>
+              </Link>
               {item.selectedColor && (
                 <p className="text-xs sm:text-sm text-gray-600 mt-1">
                   Cor: {item.selectedColor}

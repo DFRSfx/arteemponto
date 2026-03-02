@@ -127,19 +127,18 @@ export default function OrdersList() {
             <div className="w-full sm:w-48">
               <label htmlFor="status-filter" className="sr-only">Filtrar por estado</label>
               <AdminSelect
-                id="status-filter"
                 value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
+                onChange={(value) => setSelectedStatus(value)}
                 wrapperClassName="w-full"
-                className="py-2"
-              >
-                <option value="all">Todos os estados</option>
-                <option value="pending">Pendente</option>
-                <option value="processing">A Processar</option>
-                <option value="shipped">Enviado</option>
-                <option value="delivered">Entregue</option>
-                <option value="cancelled">Cancelado</option>
-              </AdminSelect>
+                options={[
+                  { value: 'all', label: 'Todos os estados' },
+                  { value: 'pending', label: 'Pendente' },
+                  { value: 'processing', label: 'A Processar' },
+                  { value: 'shipped', label: 'Enviado' },
+                  { value: 'delivered', label: 'Entregue' },
+                  { value: 'cancelled', label: 'Cancelado' },
+                ]}
+              />
             </div>
           </div>
         </div>

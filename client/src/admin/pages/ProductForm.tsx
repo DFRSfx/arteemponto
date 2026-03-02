@@ -36,8 +36,13 @@ export default function ProductForm() {
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const priceRef = useRef<HTMLInputElement>(null);
+  const stockRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
   const touchedElement = useRef<HTMLDivElement | null>(null);
@@ -82,6 +87,7 @@ export default function ProductForm() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setSelectedFiles(prev => [...prev, ...files]);
+    if (files.length > 0) clearFieldError('images');
 
     // Create previews
     files.forEach(file => {
@@ -164,25 +170,44 @@ export default function ProductForm() {
     }
   };
 
+  const clearFieldError = (field: string) => {
+    setFieldErrors(prev => { const next = { ...prev }; delete next[field]; return next; });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
 
-    try {
-      // Validate required fields
-      if (!formData.name || !formData.description || !formData.price || !formData.category_id) {
-        setError('Por favor, preencha todos os campos obrigatórios');
-        setLoading(false);
-        return;
-      }
+    const errors: Record<string, string> = {};
+    if (!formData.name.trim()) errors.name = 'Campo obrigatório';
+    if (!formData.description.trim()) errors.description = 'Campo obrigatório';
+    if (!formData.price || formData.price <= 0) errors.price = 'Introduza um preço válido';
+    if (!formData.category_id) errors.category_id = 'Selecione uma categoria';
+    if (!isEdit && selectedFiles.length === 0) errors.images = 'Adicione pelo menos uma imagem';
 
-      // Check if we have at least one image
-      if (!isEdit && selectedFiles.length === 0) {
-        setError('Por favor, adicione pelo menos uma imagem');
-        setLoading(false);
-        return;
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      // Scroll to first invalid field
+      if (errors.name) {
+        nameRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        nameRef.current?.focus();
+      } else if (errors.description) {
+        descriptionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        descriptionRef.current?.focus();
+      } else if (errors.price) {
+        priceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        priceRef.current?.focus();
+      } else if (errors.stock) {
+        stockRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        stockRef.current?.focus();
       }
+      return;
+    }
+    setFieldErrors({});
+
+    setLoading(true);
+
+    try {
 
       const formDataToSend = new FormData();
       
@@ -257,19 +282,20 @@ export default function ProductForm() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} noValidate className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Nome do Produto *
               </label>
               <input
+                ref={nameRef}
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                required
+                onChange={(e) => { setFormData({ ...formData, name: e.target.value }); clearFieldError('name'); }}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none ${fieldErrors.name ? 'border-red-500' : 'border-gray-300'}`}
               />
+              {fieldErrors.name && <p className="mt-1.5 text-sm text-red-500">{fieldErrors.name}</p>}
             </div>
 
             <div>
@@ -278,23 +304,18 @@ export default function ProductForm() {
               </label>
               <AdminSelect
                 value={formData.category_id}
-                onChange={(e) => {
-                  const numValue = parseInt(e.target.value, 10);
+                onChange={(value) => {
+                  const numValue = parseInt(value, 10);
                   if (!isNaN(numValue)) {
                     setFormData({ ...formData, category_id: numValue });
+                    clearFieldError('category_id');
                   }
                 }}
                 wrapperClassName="w-full"
-                className="py-2"
-                required
-              >
-                <option value={0}>Selecione uma categoria</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </AdminSelect>
+                placeholder="Selecione uma categoria"
+                options={categories.map(cat => ({ value: cat.id, label: cat.name }))}
+              />
+              {fieldErrors.category_id && <p className="mt-1.5 text-sm text-red-500">{fieldErrors.category_id}</p>}
             </div>
           </div>
 
@@ -303,12 +324,13 @@ export default function ProductForm() {
               Descrição *
             </label>
             <textarea
+              ref={descriptionRef}
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) => { setFormData({ ...formData, description: e.target.value }); clearFieldError('description'); }}
               rows={4}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-              required
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none ${fieldErrors.description ? 'border-red-500' : 'border-gray-300'}`}
             />
+            {fieldErrors.description && <p className="mt-1.5 text-sm text-red-500">{fieldErrors.description}</p>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -317,14 +339,15 @@ export default function ProductForm() {
                 Preço (€) *
               </label>
               <input
+                ref={priceRef}
                 type="number"
                 step="0.01"
                 min="0"
                 value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                required
+                onChange={(e) => { setFormData({ ...formData, price: parseFloat(e.target.value) }); clearFieldError('price'); }}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none ${fieldErrors.price ? 'border-red-500' : 'border-gray-300'}`}
               />
+              {fieldErrors.price && <p className="mt-1.5 text-sm text-red-500">{fieldErrors.price}</p>}
             </div>
 
             <div>
@@ -332,12 +355,12 @@ export default function ProductForm() {
                 Stock
               </label>
               <input
+                ref={stockRef}
                 type="number"
                 min="0"
                 value={formData.stock}
-                onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) })}
+                onChange={(e) => { setFormData({ ...formData, stock: parseInt(e.target.value) }); clearFieldError('stock'); }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                required
               />
             </div>
 
@@ -367,6 +390,7 @@ export default function ProductForm() {
             <p className="text-xs text-gray-500 mb-3">
               As imagens serão automaticamente otimizadas e convertidas para WebP para melhor performance
             </p>
+            {fieldErrors.images && <p className="mb-3 text-sm text-red-500">{fieldErrors.images}</p>}
             <div className="space-y-4">
               {/* File Upload */}
               <div className="flex items-center justify-center w-full">

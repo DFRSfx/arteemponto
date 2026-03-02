@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, User, Mail, AlertCircle, Lock } from 'lucide-react';
 import { getAbsoluteImageUrl } from '../utils/imageUtils';
@@ -107,6 +107,18 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
   const [saveAddress, setSaveAddress] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showGuestWarning, setShowGuestWarning] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const nameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const addressRef = useRef<HTMLInputElement>(null);
+  const cityRef = useRef<HTMLInputElement>(null);
+  const postalCodeRef = useRef<HTMLInputElement>(null);
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors(prev => { const next = { ...prev }; delete next[field]; return next; });
+  };
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -160,11 +172,34 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
     e.preventDefault();
     if (!stripe || !elements) return;
 
-    if (!customerInfo.name || !customerInfo.email || !customerInfo.phone ||
-        !customerInfo.address || !customerInfo.city || !customerInfo.postalCode) {
-      showError('Por favor preencha todos os campos obrigatórios');
+    const errors: Record<string, string> = {};
+    if (!customerInfo.name.trim()) errors.name = 'Nome completo é obrigatório';
+    if (!customerInfo.email.trim()) {
+      errors.email = 'Email é obrigatório';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email)) {
+      errors.email = 'Formato de email inválido';
+    }
+    if (!customerInfo.phone.trim()) errors.phone = 'Telefone é obrigatório';
+    if (!customerInfo.address.trim()) errors.address = 'Endereço é obrigatório';
+    if (!customerInfo.city.trim()) errors.city = 'Cidade é obrigatória';
+    if (!customerInfo.postalCode.trim()) {
+      errors.postalCode = 'Código postal é obrigatório';
+    } else if (!/^\d{4}-\d{3}$/.test(customerInfo.postalCode.trim())) {
+      errors.postalCode = 'Formato inválido (ex: 1234-567)';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const refs: Record<string, React.RefObject<HTMLInputElement>> = {
+        name: nameRef, email: emailRef, phone: phoneRef,
+        address: addressRef, city: cityRef, postalCode: postalCodeRef,
+      };
+      const firstKey = Object.keys(errors)[0];
+      refs[firstKey]?.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      refs[firstKey]?.current?.focus();
       return;
     }
+    setFieldErrors({});
 
     if (!isAuthenticated) {
       localStorage.setItem('guest_checkout_data', JSON.stringify(customerInfo));
@@ -372,28 +407,31 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">Nome Completo *</label>
-                        <input type="text" required value={customerInfo.name}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
-                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500" />
+                        <input type="text" ref={nameRef} value={customerInfo.name}
+                          onChange={(e) => { setCustomerInfo({ ...customerInfo, name: e.target.value }); clearFieldError('name'); }}
+                          className={`w-full px-4 py-2.5 border rounded-lg focus:ring-primary-500 focus:border-primary-500 ${fieldErrors.name ? 'border-red-500' : 'border-gray-300'}`} />
+                        {fieldErrors.name && <p className="mt-1.5 text-sm text-red-500">{fieldErrors.name}</p>}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">Email *</label>
-                        <input type="email" required value={customerInfo.email}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
+                        <input type="email" ref={emailRef} value={customerInfo.email}
+                          onChange={(e) => { setCustomerInfo({ ...customerInfo, email: e.target.value }); clearFieldError('email'); }}
                           onBlur={(e) => {
                             if (e.target.value) {
                               const prev = JSON.parse(localStorage.getItem('guest_checkout_data') || '{}');
                               localStorage.setItem('guest_checkout_data', JSON.stringify({ ...prev, email: e.target.value }));
                             }
                           }}
-                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500" />
+                          className={`w-full px-4 py-2.5 border rounded-lg focus:ring-primary-500 focus:border-primary-500 ${fieldErrors.email ? 'border-red-500' : 'border-gray-300'}`} />
+                        {fieldErrors.email && <p className="mt-1.5 text-sm text-red-500">{fieldErrors.email}</p>}
                       </div>
                       <div className="sm:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">Telefone *</label>
-                        <input type="tel" required value={customerInfo.phone}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                        <input type="tel" ref={phoneRef} value={customerInfo.phone}
+                          onChange={(e) => { setCustomerInfo({ ...customerInfo, phone: e.target.value }); clearFieldError('phone'); }}
                           placeholder="919626697"
-                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500" />
+                          className={`w-full px-4 py-2.5 border rounded-lg focus:ring-primary-500 focus:border-primary-500 ${fieldErrors.phone ? 'border-red-500' : 'border-gray-300'}`} />
+                        {fieldErrors.phone && <p className="mt-1.5 text-sm text-red-500">{fieldErrors.phone}</p>}
                       </div>
                     </div>
                   </div>
@@ -403,23 +441,26 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
                     <div className="space-y-5">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">Endereço *</label>
-                        <input type="text" required value={customerInfo.address}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
-                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500" />
+                        <input type="text" ref={addressRef} value={customerInfo.address}
+                          onChange={(e) => { setCustomerInfo({ ...customerInfo, address: e.target.value }); clearFieldError('address'); }}
+                          className={`w-full px-4 py-2.5 border rounded-lg focus:ring-primary-500 focus:border-primary-500 ${fieldErrors.address ? 'border-red-500' : 'border-gray-300'}`} />
+                        {fieldErrors.address && <p className="mt-1.5 text-sm text-red-500">{fieldErrors.address}</p>}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1.5">Cidade *</label>
-                          <input type="text" required value={customerInfo.city}
-                            onChange={(e) => setCustomerInfo({ ...customerInfo, city: e.target.value })}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500" />
+                          <input type="text" ref={cityRef} value={customerInfo.city}
+                            onChange={(e) => { setCustomerInfo({ ...customerInfo, city: e.target.value }); clearFieldError('city'); }}
+                            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-primary-500 focus:border-primary-500 ${fieldErrors.city ? 'border-red-500' : 'border-gray-300'}`} />
+                          {fieldErrors.city && <p className="mt-1.5 text-sm text-red-500">{fieldErrors.city}</p>}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1.5">Código Postal *</label>
-                          <input type="text" required value={customerInfo.postalCode}
-                            onChange={(e) => setCustomerInfo({ ...customerInfo, postalCode: e.target.value })}
+                          <input type="text" ref={postalCodeRef} value={customerInfo.postalCode}
+                            onChange={(e) => { setCustomerInfo({ ...customerInfo, postalCode: e.target.value }); clearFieldError('postalCode'); }}
                             placeholder="1234-567"
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500" />
+                            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-primary-500 focus:border-primary-500 ${fieldErrors.postalCode ? 'border-red-500' : 'border-gray-300'}`} />
+                          {fieldErrors.postalCode && <p className="mt-1.5 text-sm text-red-500">{fieldErrors.postalCode}</p>}
                         </div>
                       </div>
                     </div>

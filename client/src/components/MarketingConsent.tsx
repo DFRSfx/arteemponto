@@ -10,6 +10,7 @@ const MarketingConsent: React.FC = () => {
 
   // Estado do Formulário Newsletter
   const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
 
   // Estado das Preferências de Cookies
   const [cookieConsent, setCookieConsent] = useState({
@@ -49,6 +50,11 @@ const MarketingConsent: React.FC = () => {
 
   const handleNewsletterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) {
+      setEmailError('Introduza o seu email');
+      return;
+    }
+    setEmailError('');
     console.log(`Subscribed: ${email}`);
     handleCloseNewsletter();
   };
@@ -139,15 +145,17 @@ const MarketingConsent: React.FC = () => {
               <h3 className="text-xl font-medium text-gray-900 mb-2 leading-relaxed tracking-wide">
                 Be the first to know about<br/>exclusive deals and new<br/>arrivals!
               </h3>
-              <form onSubmit={handleNewsletterSubmit} className="w-full max-w-[260px] space-y-3 mt-6">
-                <input
-                  type="email"
-                  placeholder="Join our mailing list"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 bg-[#e9e9e9] border-none text-gray-900 placeholder:text-gray-500 focus:ring-1 focus:ring-gray-400 outline-none text-center text-sm"
-                />
+              <form onSubmit={handleNewsletterSubmit} noValidate className="w-full max-w-[260px] space-y-3 mt-6">
+                <div>
+                  <input
+                    type="email"
+                    placeholder="Join our mailing list"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(''); }}
+                    className={`w-full px-4 py-3 bg-[#e9e9e9] border-none text-gray-900 placeholder:text-gray-500 focus:ring-1 focus:ring-gray-400 outline-none text-center text-sm ${emailError ? 'ring-1 ring-red-400' : ''}`}
+                  />
+                  {emailError && <p className="mt-1 text-xs text-red-500 text-center">{emailError}</p>}
+                </div>
                 <button
                   type="submit"
                   className="w-full py-3 bg-black text-white hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 text-[11px] tracking-[0.2em] uppercase font-bold"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useNavigate } from 'react-router-dom';
@@ -48,6 +48,27 @@ const Profile: React.FC = () => {
   const [addressSaving, setAddressSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  // Field-level validation errors
+  const [profileFieldErrors, setProfileFieldErrors] = useState<Record<string, string>>({});
+  const [addressFieldErrors, setAddressFieldErrors] = useState<Record<string, string>>({});
+  const [passwordFieldErrors, setPasswordFieldErrors] = useState<Record<string, string>>({});
+
+  // Profile form refs
+  const profileNameRef = useRef<HTMLInputElement>(null);
+  const profileEmailRef = useRef<HTMLInputElement>(null);
+
+  // Address form refs
+  const addrNameRef = useRef<HTMLInputElement>(null);
+  const addrPhoneRef = useRef<HTMLInputElement>(null);
+  const addrAddressRef = useRef<HTMLInputElement>(null);
+  const addrCityRef = useRef<HTMLInputElement>(null);
+  const addrPostalRef = useRef<HTMLInputElement>(null);
+
+  // Password form refs
+  const currentPasswordRef = useRef<HTMLInputElement>(null);
+  const newPasswordRef = useRef<HTMLInputElement>(null);
+  const confirmPasswordRef = useRef<HTMLInputElement>(null);
+
   const API = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
 
   React.useEffect(() => {
@@ -72,24 +93,81 @@ const Profile: React.FC = () => {
     fetchAddresses();
   }, [token]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const clearProfileError = (field: string) => {
+    setProfileFieldErrors(prev => { const next = { ...prev }; delete next[field]; return next; });
+  };
 
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) =>
+  const clearAddressError = (field: string) => {
+    setAddressFieldErrors(prev => { const next = { ...prev }; delete next[field]; return next; });
+  };
+
+  const clearPasswordError = (field: string) => {
+    setPasswordFieldErrors(prev => { const next = { ...prev }; delete next[field]; return next; });
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    clearProfileError(e.target.name);
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPasswordData({ ...passwordData, [e.target.name]: e.target.value });
+    clearPasswordError(e.target.name);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const errors: Record<string, string> = {};
+    if (!formData.name.trim()) errors.name = 'Campo obrigatório';
+    if (!formData.email.trim()) errors.email = 'Campo obrigatório';
+
+    if (Object.keys(errors).length > 0) {
+      setProfileFieldErrors(errors);
+      const refs: Record<string, React.RefObject<HTMLInputElement | null>> = {
+        name: profileNameRef,
+        email: profileEmailRef,
+      };
+      const firstKey = Object.keys(errors)[0];
+      refs[firstKey]?.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      refs[firstKey]?.current?.focus();
+      return;
+    }
+    setProfileFieldErrors({});
+
     console.log('Updating profile:', formData);
     setIsEditing(false);
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      error('As passwords não coincidem');
+
+    const errors: Record<string, string> = {};
+    if (!passwordData.currentPassword) errors.currentPassword = 'Campo obrigatório';
+    if (!passwordData.newPassword) errors.newPassword = 'Campo obrigatório';
+    if (!passwordData.confirmPassword) errors.confirmPassword = 'Campo obrigatório';
+
+    if (Object.keys(errors).length > 0) {
+      setPasswordFieldErrors(errors);
+      const refs: Record<string, React.RefObject<HTMLInputElement | null>> = {
+        currentPassword: currentPasswordRef,
+        newPassword: newPasswordRef,
+        confirmPassword: confirmPasswordRef,
+      };
+      const firstKey = Object.keys(errors)[0];
+      refs[firstKey]?.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      refs[firstKey]?.current?.focus();
       return;
     }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordFieldErrors({ confirmPassword: 'As passwords não coincidem' });
+      confirmPasswordRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      confirmPasswordRef.current?.focus();
+      return;
+    }
+
+    setPasswordFieldErrors({});
     console.log('Changing password');
     setShowPasswordForm(false);
     setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -99,6 +177,7 @@ const Profile: React.FC = () => {
   const openAddForm = () => {
     setEditingAddress(null);
     setAddressForm(emptyAddressForm);
+    setAddressFieldErrors({});
     setShowAddressForm(true);
   };
 
@@ -112,6 +191,7 @@ const Profile: React.FC = () => {
       phone: addr.phone,
       is_default: addr.is_default,
     });
+    setAddressFieldErrors({});
     setShowAddressForm(true);
   };
 
@@ -119,15 +199,41 @@ const Profile: React.FC = () => {
     setShowAddressForm(false);
     setEditingAddress(null);
     setAddressForm(emptyAddressForm);
+    setAddressFieldErrors({});
   };
 
   const handleAddressFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setAddressForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    if (type !== 'checkbox') clearAddressError(name);
   };
 
   const handleAddressSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const errors: Record<string, string> = {};
+    if (!addressForm.name.trim()) errors.name = 'Campo obrigatório';
+    if (!addressForm.phone.trim()) errors.phone = 'Campo obrigatório';
+    if (!addressForm.address.trim()) errors.address = 'Campo obrigatório';
+    if (!addressForm.city.trim()) errors.city = 'Campo obrigatório';
+    if (!addressForm.postal_code.trim()) errors.postal_code = 'Campo obrigatório';
+
+    if (Object.keys(errors).length > 0) {
+      setAddressFieldErrors(errors);
+      const refs: Record<string, React.RefObject<HTMLInputElement | null>> = {
+        name: addrNameRef,
+        phone: addrPhoneRef,
+        address: addrAddressRef,
+        city: addrCityRef,
+        postal_code: addrPostalRef,
+      };
+      const firstKey = Object.keys(errors)[0];
+      refs[firstKey]?.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      refs[firstKey]?.current?.focus();
+      return;
+    }
+    setAddressFieldErrors({});
+
     setAddressSaving(true);
     try {
       const method = editingAddress ? 'PUT' : 'POST';
@@ -204,30 +310,94 @@ const Profile: React.FC = () => {
 
   if (!isAuthenticated) return null;
 
-  const InputField = ({ label, id, icon: Icon, type = 'text', value, onChange, disabled, required = false }: any) => (
+  // Local input component — no required on the DOM input
+  const InputField = ({
+    label,
+    id,
+    icon: Icon,
+    type = 'text',
+    value,
+    onChange,
+    disabled,
+    fieldError,
+    inputRef,
+  }: {
+    label: string;
+    id: string;
+    icon: React.ElementType;
+    type?: string;
+    value: string;
+    onChange: React.ChangeEventHandler<HTMLInputElement>;
+    disabled: boolean;
+    fieldError?: string;
+    inputRef?: React.RefObject<HTMLInputElement | null>;
+  }) => (
     <div className="space-y-1.5">
       <label htmlFor={id} className="block text-sm font-medium text-gray-700">
-        {label} {required && <span className="text-red-500">*</span>}
+        {label}
       </label>
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
           <Icon className={`h-5 w-5 transition-colors ${disabled ? 'text-gray-300' : 'text-amber-700'}`} aria-hidden="true" />
         </div>
         <input
+          ref={inputRef}
           type={type}
           name={id}
           id={id}
           value={value}
           onChange={onChange}
           disabled={disabled}
-          required={required}
           className={`block w-full pl-10 pr-3 py-2.5 sm:text-sm rounded-lg transition-all duration-300 outline-none
             ${disabled
               ? 'bg-gray-50/50 border-transparent text-gray-500 shadow-none'
-              : 'bg-white border-gray-300 text-gray-900 shadow-sm border focus:ring-2 focus:ring-amber-600 focus:border-amber-600 hover:border-gray-400'
+              : `bg-white text-gray-900 shadow-sm border focus:ring-2 focus:ring-amber-600 focus:border-amber-600 hover:border-gray-400 ${fieldError ? 'border-red-500' : 'border-gray-300'}`
             }`}
         />
       </div>
+      {fieldError && !disabled && (
+        <p className="mt-1 text-sm text-red-500">{fieldError}</p>
+      )}
+    </div>
+  );
+
+  // Password input component
+  const PasswordField = ({
+    label,
+    id,
+    value,
+    onChange,
+    fieldError,
+    inputRef,
+  }: {
+    label: string;
+    id: string;
+    value: string;
+    onChange: React.ChangeEventHandler<HTMLInputElement>;
+    fieldError?: string;
+    inputRef?: React.RefObject<HTMLInputElement | null>;
+  }) => (
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700">
+        {label}
+      </label>
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Lock className={`h-5 w-5 transition-colors text-amber-700`} aria-hidden="true" />
+        </div>
+        <input
+          ref={inputRef}
+          type="password"
+          name={id}
+          id={id}
+          value={value}
+          onChange={onChange}
+          className={`block w-full pl-10 pr-3 py-2.5 sm:text-sm rounded-lg transition-all duration-300 outline-none bg-white text-gray-900 shadow-sm border focus:ring-2 focus:ring-amber-600 focus:border-amber-600 hover:border-gray-400 ${fieldError ? 'border-red-500' : 'border-gray-300'}`}
+        />
+      </div>
+      {fieldError && (
+        <p className="mt-1 text-sm text-red-500">{fieldError}</p>
+      )}
     </div>
   );
 
@@ -287,16 +457,43 @@ const Profile: React.FC = () => {
             )}
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 sm:p-8">
+          <form onSubmit={handleSubmit} noValidate className="p-6 sm:p-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
-              <InputField id="name" label="Nome Completo" value={formData.name} onChange={handleChange} disabled={!isEditing} icon={User} required />
-              <InputField id="email" type="email" label="Email" value={formData.email} onChange={handleChange} disabled={!isEditing} icon={Mail} required />
-              <InputField id="phone" type="tel" label="Telefone" value={formData.phone} onChange={handleChange} disabled={!isEditing} icon={Phone} />
+              <InputField
+                id="name"
+                label="Nome Completo *"
+                value={formData.name}
+                onChange={handleChange}
+                disabled={!isEditing}
+                icon={User}
+                fieldError={profileFieldErrors.name}
+                inputRef={profileNameRef}
+              />
+              <InputField
+                id="email"
+                type="email"
+                label="Email *"
+                value={formData.email}
+                onChange={handleChange}
+                disabled={!isEditing}
+                icon={Mail}
+                fieldError={profileFieldErrors.email}
+                inputRef={profileEmailRef}
+              />
+              <InputField
+                id="phone"
+                type="tel"
+                label="Telefone"
+                value={formData.phone}
+                onChange={handleChange}
+                disabled={!isEditing}
+                icon={Phone}
+              />
             </div>
 
             {isEditing && (
               <div className="flex flex-col-reverse sm:flex-row gap-3 mt-8 pt-6 border-t border-gray-50">
-                <button type="button" onClick={() => setIsEditing(false)} className="w-full sm:w-auto px-6 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                <button type="button" onClick={() => { setIsEditing(false); setProfileFieldErrors({}); }} className="w-full sm:w-auto px-6 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
                   Cancelar
                 </button>
                 <button type="submit" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-amber-800 text-white font-medium rounded-lg hover:bg-amber-900 transition-colors shadow-sm">
@@ -341,7 +538,7 @@ const Profile: React.FC = () => {
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                <form onSubmit={handleAddressSave} className="space-y-4">
+                <form onSubmit={handleAddressSave} noValidate className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Label */}
                     <div className="space-y-1.5">
@@ -349,13 +546,16 @@ const Profile: React.FC = () => {
                         Nome da Morada <span className="text-red-500">*</span>
                       </label>
                       <input
+                        ref={addrNameRef}
                         name="name"
                         value={addressForm.name}
                         onChange={handleAddressFormChange}
-                        required
                         placeholder="ex: Casa, Trabalho"
-                        className="block w-full px-3 py-2.5 sm:text-sm rounded-lg border border-gray-300 text-gray-900 bg-white shadow-sm focus:ring-2 focus:ring-amber-600 focus:border-amber-600 outline-none"
+                        className={`block w-full px-3 py-2.5 sm:text-sm rounded-lg border text-gray-900 bg-white shadow-sm focus:ring-2 focus:ring-amber-600 focus:border-amber-600 outline-none ${addressFieldErrors.name ? 'border-red-500' : 'border-gray-300'}`}
                       />
+                      {addressFieldErrors.name && (
+                        <p className="mt-1 text-sm text-red-500">{addressFieldErrors.name}</p>
+                      )}
                     </div>
                     {/* Phone */}
                     <div className="space-y-1.5">
@@ -363,13 +563,16 @@ const Profile: React.FC = () => {
                         Telemóvel <span className="text-red-500">*</span>
                       </label>
                       <input
+                        ref={addrPhoneRef}
                         name="phone"
                         value={addressForm.phone}
                         onChange={handleAddressFormChange}
-                        required
                         placeholder="912 345 678"
-                        className="block w-full px-3 py-2.5 sm:text-sm rounded-lg border border-gray-300 text-gray-900 bg-white shadow-sm focus:ring-2 focus:ring-amber-600 focus:border-amber-600 outline-none"
+                        className={`block w-full px-3 py-2.5 sm:text-sm rounded-lg border text-gray-900 bg-white shadow-sm focus:ring-2 focus:ring-amber-600 focus:border-amber-600 outline-none ${addressFieldErrors.phone ? 'border-red-500' : 'border-gray-300'}`}
                       />
+                      {addressFieldErrors.phone && (
+                        <p className="mt-1 text-sm text-red-500">{addressFieldErrors.phone}</p>
+                      )}
                     </div>
                     {/* Address full width */}
                     <div className="sm:col-span-2 space-y-1.5">
@@ -377,13 +580,16 @@ const Profile: React.FC = () => {
                         Morada Completa <span className="text-red-500">*</span>
                       </label>
                       <input
+                        ref={addrAddressRef}
                         name="address"
                         value={addressForm.address}
                         onChange={handleAddressFormChange}
-                        required
                         placeholder="Rua, número, andar"
-                        className="block w-full px-3 py-2.5 sm:text-sm rounded-lg border border-gray-300 text-gray-900 bg-white shadow-sm focus:ring-2 focus:ring-amber-600 focus:border-amber-600 outline-none"
+                        className={`block w-full px-3 py-2.5 sm:text-sm rounded-lg border text-gray-900 bg-white shadow-sm focus:ring-2 focus:ring-amber-600 focus:border-amber-600 outline-none ${addressFieldErrors.address ? 'border-red-500' : 'border-gray-300'}`}
                       />
+                      {addressFieldErrors.address && (
+                        <p className="mt-1 text-sm text-red-500">{addressFieldErrors.address}</p>
+                      )}
                     </div>
                     {/* City */}
                     <div className="space-y-1.5">
@@ -391,13 +597,16 @@ const Profile: React.FC = () => {
                         Cidade <span className="text-red-500">*</span>
                       </label>
                       <input
+                        ref={addrCityRef}
                         name="city"
                         value={addressForm.city}
                         onChange={handleAddressFormChange}
-                        required
                         placeholder="Lisboa"
-                        className="block w-full px-3 py-2.5 sm:text-sm rounded-lg border border-gray-300 text-gray-900 bg-white shadow-sm focus:ring-2 focus:ring-amber-600 focus:border-amber-600 outline-none"
+                        className={`block w-full px-3 py-2.5 sm:text-sm rounded-lg border text-gray-900 bg-white shadow-sm focus:ring-2 focus:ring-amber-600 focus:border-amber-600 outline-none ${addressFieldErrors.city ? 'border-red-500' : 'border-gray-300'}`}
                       />
+                      {addressFieldErrors.city && (
+                        <p className="mt-1 text-sm text-red-500">{addressFieldErrors.city}</p>
+                      )}
                     </div>
                     {/* Postal code */}
                     <div className="space-y-1.5">
@@ -405,13 +614,16 @@ const Profile: React.FC = () => {
                         Código Postal <span className="text-red-500">*</span>
                       </label>
                       <input
+                        ref={addrPostalRef}
                         name="postal_code"
                         value={addressForm.postal_code}
                         onChange={handleAddressFormChange}
-                        required
                         placeholder="1000-001"
-                        className="block w-full px-3 py-2.5 sm:text-sm rounded-lg border border-gray-300 text-gray-900 bg-white shadow-sm focus:ring-2 focus:ring-amber-600 focus:border-amber-600 outline-none"
+                        className={`block w-full px-3 py-2.5 sm:text-sm rounded-lg border text-gray-900 bg-white shadow-sm focus:ring-2 focus:ring-amber-600 focus:border-amber-600 outline-none ${addressFieldErrors.postal_code ? 'border-red-500' : 'border-gray-300'}`}
                       />
+                      {addressFieldErrors.postal_code && (
+                        <p className="mt-1 text-sm text-red-500">{addressFieldErrors.postal_code}</p>
+                      )}
                     </div>
                   </div>
 
@@ -538,10 +750,31 @@ const Profile: React.FC = () => {
                   Alterar Password
                 </button>
               ) : (
-                <form onSubmit={handlePasswordSubmit} className="max-w-md space-y-5">
-                  <InputField id="currentPassword" type="password" label="Password Atual" value={passwordData.currentPassword} onChange={handlePasswordChange} disabled={false} icon={Lock} required />
-                  <InputField id="newPassword" type="password" label="Nova Password" value={passwordData.newPassword} onChange={handlePasswordChange} disabled={false} icon={Lock} required />
-                  <InputField id="confirmPassword" type="password" label="Confirmar Nova Password" value={passwordData.confirmPassword} onChange={handlePasswordChange} disabled={false} icon={Lock} required />
+                <form onSubmit={handlePasswordSubmit} noValidate className="max-w-md space-y-5">
+                  <PasswordField
+                    id="currentPassword"
+                    label="Password Atual *"
+                    value={passwordData.currentPassword}
+                    onChange={handlePasswordChange}
+                    fieldError={passwordFieldErrors.currentPassword}
+                    inputRef={currentPasswordRef}
+                  />
+                  <PasswordField
+                    id="newPassword"
+                    label="Nova Password *"
+                    value={passwordData.newPassword}
+                    onChange={handlePasswordChange}
+                    fieldError={passwordFieldErrors.newPassword}
+                    inputRef={newPasswordRef}
+                  />
+                  <PasswordField
+                    id="confirmPassword"
+                    label="Confirmar Nova Password *"
+                    value={passwordData.confirmPassword}
+                    onChange={handlePasswordChange}
+                    fieldError={passwordFieldErrors.confirmPassword}
+                    inputRef={confirmPasswordRef}
+                  />
 
                   <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
                     <button
@@ -549,6 +782,7 @@ const Profile: React.FC = () => {
                       onClick={() => {
                         setShowPasswordForm(false);
                         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                        setPasswordFieldErrors({});
                       }}
                       className="w-full sm:w-auto px-6 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
                     >

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, Mail, CheckCircle, ArrowLeft } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 import FloatingLabelInput from './FloatingLabelInput';
@@ -28,7 +28,21 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
   const [showVerificationNotice, setShowVerificationNotice] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
-  const [isProcessingGoogleCode, setIsProcessingGoogleCode] = useState(false);
+
+  // Per-field validation errors (shared across all form modes, cleared on mode switch)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Login refs
+  const loginEmailRef = useRef<HTMLInputElement>(null);
+  const loginPasswordRef = useRef<HTMLInputElement>(null);
+
+  // Register refs
+  const registerNameRef = useRef<HTMLInputElement>(null);
+  const registerEmailRef = useRef<HTMLInputElement>(null);
+  const registerPasswordRef = useRef<HTMLInputElement>(null);
+
+  // Forgot password ref
+  const forgotEmailRef = useRef<HTMLInputElement>(null);
 
   // Swipe to close states
   const [isDragging, setIsDragging] = useState(false);
@@ -52,6 +66,20 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
 
   const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
 
+  const clearFieldError = (field: string) => {
+    setFieldErrors(prev => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const switchMode = (newMode: 'login' | 'register' | 'forgot') => {
+    setMode(newMode);
+    setFieldErrors({});
+    setError(null);
+  };
+
   React.useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
@@ -61,74 +89,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
       setForgotSuccess(false);
       setForgotEmail('');
       setError(null);
+      setFieldErrors({});
     }
   }, [isOpen]);
 
-  // Handle Google OAuth redirect callback
-  React.useEffect(() => {
-    const processGoogleCallback = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-
-      if (code && !isAuthenticated && !isProcessingGoogleCode) {
-        // Check if we've already processed this code
-        const processedCode = sessionStorage.getItem('google_oauth_processed_code');
-        if (processedCode === code) {
-          console.log('🔐 Code already processed, skipping...');
-          // Clean the URL without processing again
-          window.history.replaceState({}, document.title, window.location.pathname);
-          return;
-        }
-
-        // Mark this code as being processed
-        sessionStorage.setItem('google_oauth_processed_code', code);
-        setIsProcessingGoogleCode(true);
-
-        try {
-          setIsLoading(true);
-
-          // Send the authorization code to the backend
-          const response = await fetch(`${API_BASE_URL}/auth/google/callback`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              code,
-              redirect_uri: window.location.origin
-            }),
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Erro ao fazer login com Google');
-          }
-
-          const data = await response.json();
-
-          // Update auth context directly (no reload needed)
-          setAuthState(data.token, data.user);
-
-          // Clean the URL
-          window.history.replaceState({}, document.title, window.location.pathname);
-
-          success('Bem-vindo! Login efetuado com sucesso 🎉');
-        } catch (err: any) {
-          // Clear the processed code on error so user can retry
-          sessionStorage.removeItem('google_oauth_processed_code');
-          setError(err.message || 'Erro ao fazer login com Google');
-          showError(err.message || 'Erro ao fazer login com Google');
-          // Clean the URL even on error
-          window.history.replaceState({}, document.title, window.location.pathname);
-          setIsProcessingGoogleCode(false);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    processGoogleCallback();
-  }, [isAuthenticated, isProcessingGoogleCode]);
 
   const handleClose = () => {
     setIsClosing(true);
@@ -139,6 +103,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
       setForgotSuccess(false);
       setForgotEmail('');
       setError(null);
+      setFieldErrors({});
       setShowVerificationNotice(false);
       setRegisteredEmail('');
       setUnverifiedEmail(null);
@@ -147,15 +112,28 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
 
   const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLoginData({ ...loginData, [e.target.name]: e.target.value });
+    clearFieldError(e.target.name);
   };
 
   const handleRegisterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setRegisterData({ ...registerData, [e.target.name]: e.target.value });
+    clearFieldError(e.target.name);
   };
 
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    const errors: Record<string, string> = {};
+    if (!forgotEmail.trim()) errors.forgotEmail = 'Campo obrigatório';
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      forgotEmailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      forgotEmailRef.current?.focus();
+      return;
+    }
+    setFieldErrors({});
+
     setIsLoading(true);
 
     try {
@@ -187,6 +165,24 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
     e.preventDefault();
     setError(null);
     setUnverifiedEmail(null);
+
+    const errors: Record<string, string> = {};
+    if (!loginData.email.trim()) errors.email = 'Campo obrigatório';
+    if (!loginData.password.trim()) errors.password = 'Campo obrigatório';
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const refs: Record<string, React.RefObject<HTMLInputElement | null>> = {
+        email: loginEmailRef,
+        password: loginPasswordRef,
+      };
+      const firstKey = Object.keys(errors)[0];
+      refs[firstKey]?.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      refs[firstKey]?.current?.focus();
+      return;
+    }
+    setFieldErrors({});
+
     setIsLoading(true);
 
     try {
@@ -211,14 +207,36 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setIsLoading(true);
+
+    const errors: Record<string, string> = {};
+    if (!registerData.name.trim()) errors.name = 'Campo obrigatório';
+    if (!registerData.email.trim()) errors.email = 'Campo obrigatório';
+    if (!registerData.password.trim()) errors.password = 'Campo obrigatório';
+    if (!privacyPolicy) errors.privacyPolicy = 'Deve aceitar os Termos e a Política de Privacidade';
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const refs: Record<string, React.RefObject<HTMLInputElement | null>> = {
+        name: registerNameRef,
+        email: registerEmailRef,
+        password: registerPasswordRef,
+      };
+      const firstKey = Object.keys(errors)[0];
+      if (refs[firstKey]) {
+        refs[firstKey]?.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        refs[firstKey]?.current?.focus();
+      }
+      return;
+    }
 
     if (!isPasswordValid) {
       setError('A password não cumpre os requisitos mínimos');
       showError('A password não cumpre os requisitos mínimos');
-      setIsLoading(false);
       return;
     }
+
+    setFieldErrors({});
+    setIsLoading(true);
 
     try {
       await register(registerData.name, registerData.email, registerData.password);
@@ -301,7 +319,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
     if (dragOffset > threshold) {
       handleClose();
     }
-    
+
     setDragOffset(0);
     setStartX(0);
   };
@@ -331,8 +349,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         style={{
-          transform: isDragging 
-            ? `translate(calc(-50% + ${dragOffset}px), -50%)` 
+          transform: isDragging
+            ? `translate(calc(-50% + ${dragOffset}px), -50%)`
             : 'translate(-50%, -50%)',
           transition: isDragging ? 'none' : 'all 0.3s',
         }}
@@ -356,7 +374,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Iniciar Sessão</h2>
 
             {mode === 'login' ? (
-              <form onSubmit={handleLoginSubmit} className="space-y-6 flex-1 flex flex-col">
+              <form onSubmit={handleLoginSubmit} noValidate className="space-y-6 flex-1 flex flex-col">
                 {unverifiedEmail ? (
                   <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
                     <div className="flex items-start">
@@ -371,7 +389,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                           {error}
                         </p>
                         <p className="text-xs text-yellow-600 mb-3">
-                          Enviámos um email de verificação para <strong>{unverifiedEmail}</strong>. 
+                          Enviámos um email de verificação para <strong>{unverifiedEmail}</strong>.
                           Verifique a sua caixa de entrada (ou spam).
                         </p>
                         <button
@@ -390,27 +408,37 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                   </div>
                 ) : null}
 
-                <FloatingLabelInput
-                  id="login_email"
-                  name="email"
-                  type="email"
-                  label="Email"
-                  value={loginData.email}
-                  onChange={handleLoginChange}
-                  required
-                  autoComplete="email"
-                />
+                <div>
+                  <FloatingLabelInput
+                    id="login_email"
+                    name="email"
+                    type="email"
+                    label="Email"
+                    value={loginData.email}
+                    onChange={handleLoginChange}
+                    autoComplete="email"
+                    ref={loginEmailRef}
+                  />
+                  {fieldErrors.email && (
+                    <p className="mt-1.5 text-sm text-red-500">{fieldErrors.email}</p>
+                  )}
+                </div>
 
-                <FloatingLabelInput
-                  id="login_password"
-                  name="password"
-                  type="password"
-                  label="Password"
-                  value={loginData.password}
-                  onChange={handleLoginChange}
-                  required
-                  autoComplete="current-password"
-                />
+                <div>
+                  <FloatingLabelInput
+                    id="login_password"
+                    name="password"
+                    type="password"
+                    label="Password"
+                    value={loginData.password}
+                    onChange={handleLoginChange}
+                    autoComplete="current-password"
+                    ref={loginPasswordRef}
+                  />
+                  {fieldErrors.password && (
+                    <p className="mt-1.5 text-sm text-red-500">{fieldErrors.password}</p>
+                  )}
+                </div>
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -427,7 +455,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                   </div>
                   <button
                     type="button"
-                    onClick={() => setMode('forgot')}
+                    onClick={() => switchMode('forgot')}
                     className="text-sm text-red-500 hover:text-red-600 hover:underline transition-all"
                   >
                     Esqueceu a palavra-passe?
@@ -473,7 +501,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
             ) : mode === 'forgot' ? (
               <div className="flex-1 flex flex-col">
                 <button
-                  onClick={() => setMode('login')}
+                  onClick={() => switchMode('login')}
                   className="self-start flex items-center gap-2 text-primary-600 hover:text-primary-700 mb-4 transition-colors"
                 >
                   <ArrowLeft size={18} />
@@ -481,7 +509,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                 </button>
 
                 {!forgotSuccess ? (
-                  <form onSubmit={handleForgotPasswordSubmit} className="space-y-6 flex-1 flex flex-col">
+                  <form onSubmit={handleForgotPasswordSubmit} noValidate className="space-y-6 flex-1 flex flex-col">
                     <div className="space-y-2">
                       <h3 className="text-lg font-semibold text-gray-900">
                         Recuperar Palavra-passe
@@ -497,17 +525,25 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                       </div>
                     )}
 
-                    <FloatingLabelInput
-                      id="forgot_email"
-                      name="email"
-                      type="email"
-                      label="Email"
-                      value={forgotEmail}
-                      onChange={(e) => setForgotEmail(e.target.value)}
-                      required
-                      autoComplete="email"
-                      disabled={isLoading}
-                    />
+                    <div>
+                      <FloatingLabelInput
+                        id="forgot_email"
+                        name="forgotEmail"
+                        type="email"
+                        label="Email"
+                        value={forgotEmail}
+                        onChange={(e) => {
+                          setForgotEmail(e.target.value);
+                          clearFieldError('forgotEmail');
+                        }}
+                        autoComplete="email"
+                        disabled={isLoading}
+                        ref={forgotEmailRef}
+                      />
+                      {fieldErrors.forgotEmail && (
+                        <p className="mt-1.5 text-sm text-red-500">{fieldErrors.forgotEmail}</p>
+                      )}
+                    </div>
 
                     <div className="flex-1"></div>
 
@@ -562,7 +598,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                     </div>
 
                     <button
-                      onClick={() => setMode('login')}
+                      onClick={() => switchMode('login')}
                       className="w-full border-2 border-primary-600 text-primary-600 py-3 px-12 rounded-lg font-semibold text-sm uppercase hover:bg-primary-600 hover:text-white transition-all"
                     >
                       Voltar ao Login
@@ -601,7 +637,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                 </div>
 
                 <button
-                  onClick={() => setMode('login')}
+                  onClick={() => switchMode('login')}
                   className="w-full border-2 border-primary-600 text-primary-600 py-3 px-12 rounded-lg font-semibold text-sm uppercase hover:bg-primary-600 hover:text-white transition-all"
                 >
                   Iniciar Sessão
@@ -619,7 +655,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                 <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center mb-4">
                   <Mail className="h-10 w-10 text-primary-600" />
                 </div>
-                
+
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-3">
                     Conta Criada com Sucesso! 🎉
@@ -678,7 +714,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                 <button
                   onClick={() => {
                     setShowVerificationNotice(false);
-                    setMode('login');
+                    switchMode('login');
                   }}
                   className="w-full border-2 border-primary-600 text-primary-600 py-3 px-12 rounded-lg font-semibold text-sm uppercase hover:bg-primary-600 hover:text-white transition-all"
                 >
@@ -686,42 +722,57 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                 </button>
               </div>
             ) : mode === 'register' ? (
-              <form onSubmit={handleRegisterSubmit} className="space-y-6 flex-1 flex flex-col">
+              <form onSubmit={handleRegisterSubmit} noValidate className="space-y-6 flex-1 flex flex-col">
                 {error && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                     {error}
                   </div>
                 )}
 
-                <FloatingLabelInput
-                  id="register_name"
-                  name="name"
-                  type="text"
-                  label="Nome e Apelido"
-                  value={registerData.name}
-                  onChange={handleRegisterChange}
-                  required
-                />
+                <div>
+                  <FloatingLabelInput
+                    id="register_name"
+                    name="name"
+                    type="text"
+                    label="Nome e Apelido"
+                    value={registerData.name}
+                    onChange={handleRegisterChange}
+                    ref={registerNameRef}
+                  />
+                  {fieldErrors.name && (
+                    <p className="mt-1.5 text-sm text-red-500">{fieldErrors.name}</p>
+                  )}
+                </div>
 
-                <FloatingLabelInput
-                  id="register_email"
-                  name="email"
-                  type="email"
-                  label="Email"
-                  value={registerData.email}
-                  onChange={handleRegisterChange}
-                  required
-                />
+                <div>
+                  <FloatingLabelInput
+                    id="register_email"
+                    name="email"
+                    type="email"
+                    label="Email"
+                    value={registerData.email}
+                    onChange={handleRegisterChange}
+                    ref={registerEmailRef}
+                  />
+                  {fieldErrors.email && (
+                    <p className="mt-1.5 text-sm text-red-500">{fieldErrors.email}</p>
+                  )}
+                </div>
 
-                <FloatingLabelInput
-                  id="register_password"
-                  name="password"
-                  type="password"
-                  label="Password"
-                  value={registerData.password}
-                  onChange={handleRegisterChange}
-                  required
-                />
+                <div>
+                  <FloatingLabelInput
+                    id="register_password"
+                    name="password"
+                    type="password"
+                    label="Password"
+                    value={registerData.password}
+                    onChange={handleRegisterChange}
+                    ref={registerPasswordRef}
+                  />
+                  {fieldErrors.password && (
+                    <p className="mt-1.5 text-sm text-red-500">{fieldErrors.password}</p>
+                  )}
+                </div>
 
                 <div className="text-xs bg-gray-50 p-4 rounded-lg">
                   <p className="font-semibold mb-2 text-gray-700">
@@ -789,25 +840,32 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                   </label>
                 </div>
 
-                <div className="flex items-start">
-                  <input
-                    type="checkbox"
-                    id="privacy"
-                    checked={privacyPolicy}
-                    onChange={(e) => setPrivacyPolicy(e.target.checked)}
-                    required
-                    className="w-5 h-5 mt-0.5 text-primary-600 bg-gray-50 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
-                  />
-                  <label htmlFor="privacy" className="ml-3 text-xs text-gray-700 cursor-pointer">
-                    Li e aceito os{' '}
-                    <a href="/termos" className="text-primary-600 hover:text-primary-700 underline">
-                      Termos e Condições
-                    </a>
-                    {' '}e a{' '}
-                    <a href="/privacidade" className="text-primary-600 hover:text-primary-700 underline">
-                      Política de Privacidade
-                    </a>
-                  </label>
+                <div>
+                  <div className="flex items-start">
+                    <input
+                      type="checkbox"
+                      id="privacy"
+                      checked={privacyPolicy}
+                      onChange={(e) => {
+                        setPrivacyPolicy(e.target.checked);
+                        if (e.target.checked) clearFieldError('privacyPolicy');
+                      }}
+                      className={`w-5 h-5 mt-0.5 text-primary-600 bg-gray-50 border-gray-300 rounded focus:ring-primary-500 cursor-pointer ${fieldErrors.privacyPolicy ? 'border-red-500' : ''}`}
+                    />
+                    <label htmlFor="privacy" className="ml-3 text-xs text-gray-700 cursor-pointer">
+                      Li e aceito os{' '}
+                      <a href="/termos" className="text-primary-600 hover:text-primary-700 underline">
+                        Termos e Condições
+                      </a>
+                      {' '}e a{' '}
+                      <a href="/privacidade" className="text-primary-600 hover:text-primary-700 underline">
+                        Política de Privacidade
+                      </a>
+                    </label>
+                  </div>
+                  {fieldErrors.privacyPolicy && (
+                    <p className="mt-1.5 text-sm text-red-500">{fieldErrors.privacyPolicy}</p>
+                  )}
                 </div>
 
                 <div className="flex-1"></div>
@@ -877,7 +935,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                 </div>
 
                 <button
-                  onClick={() => setMode('register')}
+                  onClick={() => switchMode('register')}
                   className="w-full border-2 border-primary-600 text-primary-600 py-3 px-12 rounded-lg font-semibold text-sm uppercase hover:bg-primary-600 hover:text-white transition-all"
                 >
                   Criar Conta

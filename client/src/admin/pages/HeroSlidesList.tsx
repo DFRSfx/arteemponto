@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, Edit, Trash2, Save, X, MoveVertical, Eye, EyeOff } from 'lucide-react';
 import AdminSelect from '../components/AdminSelect';
 import { useToast } from '../../context/ToastContext';
@@ -41,6 +41,16 @@ export default function HeroSlidesList() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [categories, setCategories] = useState<Array<{id: number; name: string; slug: string}>>([]);
+  const [addFieldErrors, setAddFieldErrors] = useState<Record<string, string>>({});
+
+  // Refs for the Add form
+  const addTitleRef = useRef<HTMLInputElement>(null);
+  const addButtonTextRef = useRef<HTMLInputElement>(null);
+  const addImageRef = useRef<HTMLInputElement>(null);
+
+  const clearAddError = (field: string) => {
+    setAddFieldErrors(prev => { const next = { ...prev }; delete next[field]; return next; });
+  };
 
   useEffect(() => {
     loadSlides();
@@ -137,10 +147,25 @@ export default function HeroSlidesList() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!imageFile) {
-      alert('Por favor, selecione uma imagem');
+    const errors: Record<string, string> = {};
+    if (!formData.title.trim()) errors.title = 'Campo obrigatório';
+    if (!formData.button_text.trim()) errors.button_text = 'Campo obrigatório';
+    if (!imageFile) errors.image = 'Selecione uma imagem de fundo';
+
+    if (Object.keys(errors).length > 0) {
+      setAddFieldErrors(errors);
+      if (errors.title) {
+        addTitleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        addTitleRef.current?.focus();
+      } else if (errors.button_text) {
+        addButtonTextRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        addButtonTextRef.current?.focus();
+      } else if (errors.image) {
+        addImageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
+    setAddFieldErrors({});
 
     try {
       const token = localStorage.getItem('auth_token');
@@ -165,6 +190,7 @@ export default function HeroSlidesList() {
       if (response.ok) {
         showSuccess('Slide criado com sucesso!');
         setShowAddForm(false);
+        setAddFieldErrors({});
         setFormData({
           title: '',
           description: '',
@@ -317,7 +343,7 @@ export default function HeroSlidesList() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-800">Hero Slides</h1>
         <button
-          onClick={() => setShowAddForm(!showAddForm)}
+          onClick={() => { setShowAddForm(!showAddForm); setAddFieldErrors({}); }}
           className="bg-amber-600 text-white px-4 py-3 rounded-lg hover:bg-amber-700 active:bg-amber-800 transition-colors flex items-center touch-manipulation min-h-[44px]"
         >
           {showAddForm ? <X size={20} className="mr-2" /> : <Plus size={20} className="mr-2" />}
@@ -329,27 +355,29 @@ export default function HeroSlidesList() {
       {showAddForm && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Adicionar Novo Slide</h2>
-          <form onSubmit={handleAdd} className="space-y-4">
+          <form onSubmit={handleAdd} noValidate className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Título *</label>
                 <input
+                  ref={addTitleRef}
                   type="text"
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
-                  required
+                  onChange={(e) => { setFormData({ ...formData, title: e.target.value }); clearAddError('title'); }}
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none ${addFieldErrors.title ? 'border-red-500' : 'border-gray-300'}`}
                 />
+                {addFieldErrors.title && <p className="mt-1.5 text-sm text-red-500">{addFieldErrors.title}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Texto do Botão *</label>
                 <input
+                  ref={addButtonTextRef}
                   type="text"
                   value={formData.button_text}
-                  onChange={(e) => setFormData({ ...formData, button_text: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
-                  required
+                  onChange={(e) => { setFormData({ ...formData, button_text: e.target.value }); clearAddError('button_text'); }}
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none ${addFieldErrors.button_text ? 'border-red-500' : 'border-gray-300'}`}
                 />
+                {addFieldErrors.button_text && <p className="mt-1.5 text-sm text-red-500">{addFieldErrors.button_text}</p>}
               </div>
             </div>
 
@@ -406,34 +434,26 @@ export default function HeroSlidesList() {
               {formData.button_link_type === 'page' && (
                 <AdminSelect
                   value={formData.button_link}
-                  onChange={(e) => setFormData({ ...formData, button_link: e.target.value })}
+                  onChange={(value) => setFormData({ ...formData, button_link: value })}
                   wrapperClassName="w-full"
-                  className="py-3"
-                  required
-                >
-                  <option value="/loja">🛍️ Loja (Todos os Produtos)</option>
-                  <option value="/loja?filter=new">✨ Novidades</option>
-                  <option value="/loja?filter=featured">⭐ Produtos em Destaque</option>
-                  <option value="/favoritos">❤️ Favoritos</option>
-                  <option value="/">🏠 Página Inicial</option>
-                </AdminSelect>
+                  options={[
+                    { value: '/loja', label: '🛍️ Loja (Todos os Produtos)' },
+                    { value: '/loja?filter=new', label: '✨ Novidades' },
+                    { value: '/loja?filter=featured', label: '⭐ Produtos em Destaque' },
+                    { value: '/favoritos', label: '❤️ Favoritos' },
+                    { value: '/', label: '🏠 Página Inicial' },
+                  ]}
+                />
               )}
 
               {formData.button_link_type === 'category' && (
                 <AdminSelect
                   value={formData.button_link}
-                  onChange={(e) => setFormData({ ...formData, button_link: e.target.value })}
+                  onChange={(value) => setFormData({ ...formData, button_link: value })}
                   wrapperClassName="w-full"
-                  className="py-3"
-                  required
-                >
-                  <option value="">Selecione uma categoria</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={`/loja?categoria=${cat.slug}`}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </AdminSelect>
+                  placeholder="Selecione uma categoria"
+                  options={categories.map(cat => ({ value: `/loja?categoria=${cat.slug}`, label: cat.name }))}
+                />
               )}
 
               {formData.button_link_type === 'custom' && (
@@ -443,7 +463,6 @@ export default function HeroSlidesList() {
                   onChange={(e) => setFormData({ ...formData, button_link: e.target.value })}
                   placeholder="Ex: /sobre, /contacto, ou URL externa"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
-                  required
                 />
               )}
             </div>
@@ -453,25 +472,26 @@ export default function HeroSlidesList() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Cor do Texto</label>
                 <AdminSelect
                   value={formData.text_color}
-                  onChange={(e) => setFormData({ ...formData, text_color: e.target.value as 'white' | 'dark' })}
+                  onChange={(value) => setFormData({ ...formData, text_color: value as 'white' | 'dark' })}
                   wrapperClassName="w-full"
-                  className="py-2"
-                >
-                  <option value="white">Branco</option>
-                  <option value="dark">Escuro</option>
-                </AdminSelect>
+                  options={[
+                    { value: 'white', label: 'Branco' },
+                    { value: 'dark', label: 'Escuro' },
+                  ]}
+                />
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Imagem de Fundo *</label>
               <input
+                ref={addImageRef}
                 type="file"
                 accept="image/*"
-                onChange={handleImageChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
-                required
+                onChange={(e) => { handleImageChange(e); clearAddError('image'); }}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none ${addFieldErrors.image ? 'border-red-500' : 'border-gray-300'}`}
               />
+              {addFieldErrors.image && <p className="mt-1.5 text-sm text-red-500">{addFieldErrors.image}</p>}
               {imagePreview && (
                 <div className="mt-3">
                   <img src={imagePreview} alt="Preview" className="w-full h-48 object-cover rounded-lg" />
@@ -714,32 +734,26 @@ export default function HeroSlidesList() {
                         {detectLinkType(slide.button_link) === 'page' && (
                           <AdminSelect
                             value={slide.button_link}
-                            onChange={(e) => updateSlide(editingId, 'button_link', e.target.value)}
+                            onChange={(value) => updateSlide(editingId, 'button_link', value)}
                             wrapperClassName="w-full"
-                            className="py-3 text-base"
-                          >
-                            <option value="/loja">🛍️ Loja (Todos os Produtos)</option>
-                            <option value="/loja?filter=new">✨ Novidades</option>
-                            <option value="/loja?filter=featured">⭐ Produtos em Destaque</option>
-                            <option value="/favoritos">❤️ Favoritos</option>
-                            <option value="/">🏠 Página Inicial</option>
-                          </AdminSelect>
+                            options={[
+                              { value: '/loja', label: '🛍️ Loja (Todos os Produtos)' },
+                              { value: '/loja?filter=new', label: '✨ Novidades' },
+                              { value: '/loja?filter=featured', label: '⭐ Produtos em Destaque' },
+                              { value: '/favoritos', label: '❤️ Favoritos' },
+                              { value: '/', label: '🏠 Página Inicial' },
+                            ]}
+                          />
                         )}
 
                         {detectLinkType(slide.button_link) === 'category' && (
                           <AdminSelect
                             value={slide.button_link}
-                            onChange={(e) => updateSlide(editingId, 'button_link', e.target.value)}
+                            onChange={(value) => updateSlide(editingId, 'button_link', value)}
                             wrapperClassName="w-full"
-                            className="py-3 text-base"
-                          >
-                            <option value="">Selecione uma categoria</option>
-                            {categories.map(cat => (
-                              <option key={cat.id} value={`/loja?categoria=${cat.slug}`}>
-                                {cat.name}
-                              </option>
-                            ))}
-                          </AdminSelect>
+                            placeholder="Selecione uma categoria"
+                            options={categories.map(cat => ({ value: `/loja?categoria=${cat.slug}`, label: cat.name }))}
+                          />
                         )}
 
                         {detectLinkType(slide.button_link) === 'custom' && (
@@ -776,13 +790,13 @@ export default function HeroSlidesList() {
                           <label className="block text-sm font-medium text-gray-700 mb-2">Cor do Texto</label>
                           <AdminSelect
                             value={slide.text_color}
-                            onChange={(e) => updateSlide(editingId, 'text_color', e.target.value)}
+                            onChange={(value) => updateSlide(editingId, 'text_color', value)}
                             wrapperClassName="w-full"
-                            className="py-3 text-base"
-                          >
-                            <option value="white">Branco</option>
-                            <option value="dark">Escuro</option>
-                          </AdminSelect>
+                            options={[
+                              { value: 'white', label: 'Branco' },
+                              { value: 'dark', label: 'Escuro' },
+                            ]}
+                          />
                         </div>
 
                         <div>
