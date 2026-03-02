@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, User, Mail, AlertCircle, Lock } from 'lucide-react';
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
+import flags from 'react-phone-number-input/flags';
+import pt from 'react-phone-number-input/locale/pt.json';
+import 'react-phone-number-input/style.css';
+import PhoneCountrySelect from '../components/PhoneCountrySelect';
 import { getAbsoluteImageUrl } from '../utils/imageUtils';
 import { loadStripe } from '@stripe/stripe-js';
 import type { Appearance } from '@stripe/stripe-js';
@@ -82,7 +87,7 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
   const elements = useElements();
   const { items, clearCart } = useCart();
   const { isAuthenticated, user } = useAuth();
-  const { success, error: showError } = useToast();
+  const { success } = useToast();
   const navigate = useNavigate();
 
   const subtotalExVat = amount / 1.23;
@@ -158,12 +163,14 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
   };
 
   const selectAddress = (addr: ShippingAddress) => {
+    // Ensure E.164 format for PhoneInput; prepend +351 for legacy entries without prefix
+    const phone = addr.phone.startsWith('+') ? addr.phone : `+351${addr.phone.replace(/\D/g, '')}`;
     setCustomerInfo(prev => ({
       ...prev,
       address: addr.address,
       city: addr.city,
       postalCode: addr.postal_code,
-      phone: addr.phone,
+      phone,
     }));
     setShowNewAddressForm(false);
   };
@@ -179,7 +186,11 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email)) {
       errors.email = 'Formato de email inválido';
     }
-    if (!customerInfo.phone.trim()) errors.phone = 'Telefone é obrigatório';
+    if (!customerInfo.phone) {
+      errors.phone = 'Telefone é obrigatório';
+    } else if (!isValidPhoneNumber(customerInfo.phone)) {
+      errors.phone = 'Número de telefone inválido';
+    }
     if (!customerInfo.address.trim()) errors.address = 'Endereço é obrigatório';
     if (!customerInfo.city.trim()) errors.city = 'Cidade é obrigatória';
     if (!customerInfo.postalCode.trim()) {
@@ -361,7 +372,7 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           {/* ALTERAÇÃO CHAVE 2: xl:gap-16 para gerir o espaço entre blocos perfeitamente em ecrãs grandes */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 xl:gap-16 items-start">
 
@@ -427,10 +438,17 @@ const CheckoutInner: React.FC<CheckoutInnerProps> = ({ amount, paymentIntentId }
                       </div>
                       <div className="sm:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">Telefone *</label>
-                        <input type="tel" ref={phoneRef} value={customerInfo.phone}
-                          onChange={(e) => { setCustomerInfo({ ...customerInfo, phone: e.target.value }); clearFieldError('phone'); }}
-                          placeholder="919626697"
-                          className={`w-full px-4 py-2.5 border rounded-lg focus:ring-primary-500 focus:border-primary-500 ${fieldErrors.phone ? 'border-red-500' : 'border-gray-300'}`} />
+                        <PhoneInput
+                          flags={flags}
+                          labels={pt}
+                          international
+                          defaultCountry="PT"
+                          value={customerInfo.phone}
+                          onChange={(val) => { setCustomerInfo(prev => ({ ...prev, phone: val ?? '' })); clearFieldError('phone'); }}
+                          inputRef={phoneRef}
+                          countrySelectComponent={PhoneCountrySelect}
+                          className={`phone-input${fieldErrors.phone ? ' phone-input-error' : ''}`}
+                        />
                         {fieldErrors.phone && <p className="mt-1.5 text-sm text-red-500">{fieldErrors.phone}</p>}
                       </div>
                     </div>

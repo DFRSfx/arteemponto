@@ -285,7 +285,7 @@ const Orders: React.FC = () => {
                                 className="flex items-center gap-4 bg-white p-4 rounded-lg"
                               >
                                 <img
-                                  src={item.product.image}
+                                  src={getAbsoluteImageUrl(item.product.image)}
                                   alt={item.product.name}
                                   className="w-20 h-20 object-cover rounded-lg"
                                   onError={(e) => {

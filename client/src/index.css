@@ -181,6 +181,51 @@
   }
 }
 
+/* ── react-phone-number-input ────────────────────────────────── */
+.PhoneInput {
+  display: flex;
+  align-items: center;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  background-color: #f9fafb;
+  transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+
+.PhoneInputInput {
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.PhoneInput:focus-within {
+  border-color: #7D3C0F;
+  box-shadow: 0 0 0 3px rgba(125, 60, 15, 0.12);
+  background-color: #ffffff;
+}
+
+.phone-input.phone-input-error {
+  border-color: #ef4444;
+}
+
+.PhoneInputCountry {
+  display: flex;
+  align-items: stretch;
+}
+
+.PhoneInputInput {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 16px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 1rem;
+  color: #1f2937;
+  font-family: 'Urbanist', sans-serif;
+}
+
+.PhoneInputInput::placeholder {
+  color: #9ca3af;
+}
+
 /* Custom Scrollbar para o Carrinho */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;

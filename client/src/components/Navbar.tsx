@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Search, ShoppingCart, Heart, User, LogOut, Package, UserCircle, Settings, Shield } from 'lucide-react';
+import { Menu, X, Search, ShoppingCart, Heart, User, LogOut, Package, UserCircle, Settings } from 'lucide-react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useCart } from '../context/CartContext';
 import { useFavorites } from '../context/FavoritesContext';
@@ -17,10 +17,10 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
 
 const Navbar: React.FC = () => {
-  const { products, loading: productsLoading } = useProducts();
+  const { products } = useProducts();
   const { categories, loading: categoriesLoading } = useCategories();
   const { user, isAuthenticated, logout, refreshUser, setAuthState } = useAuth();
-  const { items, total, addItem, removeItem, updateQuantity, clearCart, itemCount } = useCart();
+  const { itemCount } = useCart();
   const { favorites } = useFavorites();
   const { success, info } = useToast();
 
@@ -30,7 +30,7 @@ const Navbar: React.FC = () => {
     if (categoryProducts.length === 0) return null;
 
     const randomProduct = categoryProducts[Math.floor(Math.random() * categoryProducts.length)];
-    return randomProduct.images[0] ? getAbsoluteImageUrl(imgVariant(randomProduct.images[0], 'sm')) : null;
+    return randomProduct.images[0] ? getAbsoluteImageUrl(imgVariant(randomProduct.images[0], 'md')) : null;
   };
 
   // SVG Placeholder for categories without products
