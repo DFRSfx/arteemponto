@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx watch src/index.ts",
     "build": "node build.js",
-    "start": "cross-env NODE_ENV=production node dist/index.js",
+    "start": "node dist/index.js",
     "start:dev": "cross-env NODE_ENV=development node dist/index.js",
     "typecheck": "tsc --noEmit",
     "cleanup-tokens": "tsx src/cleanup-tokens.ts",

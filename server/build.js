@@ -26,12 +26,12 @@ await esbuild.build({
   ],
   logLevel: 'info',
   banner: {
-    js: `import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-const require = createRequire(import.meta.url);
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);`,
+    js: `import { createRequire as __createRequire } from 'module';
+import { fileURLToPath as __fileURLToPath } from 'url';
+import { dirname as __dirnameFunc } from 'path';
+var require = __createRequire(import.meta.url);
+var __filename = __fileURLToPath(import.meta.url);
+var __dirname = __dirnameFunc(__filename);`,
   },
 });
 
