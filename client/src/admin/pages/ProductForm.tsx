@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { productsApi } from '../../utils/apiHelpers';
 import { useCategories } from '../../hooks/useCategories';
-import { Save, ArrowLeft, X, Upload, GripVertical, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Save, ArrowLeft, X, Upload, GripVertical, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
 import ColorPicker from '../components/ColorPicker';
 import AdminSelect from '../components/AdminSelect';
 
@@ -15,6 +15,13 @@ interface ProductFormData {
   featured: boolean;
   colors?: string[];
 }
+
+type ImageItem = {
+  type: 'existing' | 'new';
+  path?: string;
+  file?: File;
+  preview: string;
+};
 
 export default function ProductForm() {
   const navigate = useNavigate();
@@ -31,9 +38,7 @@ export default function ProductForm() {
     featured: false,
     colors: []
   });
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [images, setImages] = useState<ImageItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -74,8 +79,11 @@ export default function ProductForm() {
         
         // Load existing images from API - they come as file paths
         if (data.images && Array.isArray(data.images)) {
-          setExistingImages(data.images);
-          setImagePreviews(data.images);
+          setImages(data.images.map((path: string) => ({
+            type: 'existing',
+            path,
+            preview: path
+          })));
         }
       }
     } catch (error) {
@@ -86,88 +94,68 @@ export default function ProductForm() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    setSelectedFiles(prev => [...prev, ...files]);
     if (files.length > 0) clearFieldError('images');
 
-    // Create previews
     files.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreviews(prev => [...prev, reader.result as string]);
+        setImages(prev => [...prev, { type: 'new', file, preview: reader.result as string }]);
       };
       reader.readAsDataURL(file);
     });
   };
 
   const removeImage = (index: number) => {
-    // If it's an existing image
-    if (index < existingImages.length) {
-      setExistingImages(prev => prev.filter((_, i) => i !== index));
-      setImagePreviews(prev => prev.filter((_, i) => i !== index));
-    } else {
-      // It's a new file
-      const fileIndex = index - existingImages.length;
-      setSelectedFiles(prev => prev.filter((_, i) => i !== fileIndex));
-      setImagePreviews(prev => prev.filter((_, i) => i !== index));
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleRotateImage = async (index: number) => {
+    const currentItem = images[index];
+
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = currentItem.preview;
+      await new Promise((resolve, reject) => { 
+        img.onload = resolve; 
+        img.onerror = reject;
+      });
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      canvas.width = img.height;
+      canvas.height = img.width;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(90 * Math.PI / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      
+      const newPreview = canvas.toDataURL('image/jpeg', 0.95);
+      
+      const res = await fetch(newPreview);
+      const blob = await res.blob();
+      const newFile = new File([blob], `rotated_${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+      setImages(prev => {
+        const next = [...prev];
+        next[index] = { type: 'new', file: newFile, preview: newPreview };
+        return next;
+      });
+    } catch (error) {
+      console.error('Error rotating image:', error);
+      alert('Não foi possível rodar a imagem. Tente novamente.');
     }
   };
 
   const moveImage = (fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;
-
-    // Move in previews
-    setImagePreviews(prev => {
-      const newPreviews = [...prev];
-      const [movedItem] = newPreviews.splice(fromIndex, 1);
-      newPreviews.splice(toIndex, 0, movedItem);
-      return newPreviews;
+    setImages(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
     });
-
-    // Move in existing images or files
-    if (fromIndex < existingImages.length && toIndex < existingImages.length) {
-      // Both are existing images
-      setExistingImages(prev => {
-        const newImages = [...prev];
-        const [movedItem] = newImages.splice(fromIndex, 1);
-        newImages.splice(toIndex, 0, movedItem);
-        return newImages;
-      });
-    } else if (fromIndex >= existingImages.length && toIndex >= existingImages.length) {
-      // Both are new files
-      setSelectedFiles(prev => {
-        const newFiles = [...prev];
-        const fromFileIndex = fromIndex - existingImages.length;
-        const toFileIndex = toIndex - existingImages.length;
-        const [movedItem] = newFiles.splice(fromFileIndex, 1);
-        newFiles.splice(toFileIndex, 0, movedItem);
-        return newFiles;
-      });
-    } else {
-      // Mixed - need to reorganize both arrays
-      type AllItem =
-        | { type: 'existing'; path: string; preview: string }
-        | { type: 'new'; file: File; preview: string };
-
-      const allItems: AllItem[] = [
-        ...existingImages.map((path, i) => ({ type: 'existing' as const, path, preview: imagePreviews[i] })),
-        ...selectedFiles.map((file, i) => ({ type: 'new' as const, file, preview: imagePreviews[existingImages.length + i] }))
-      ];
-
-      const [movedItem] = allItems.splice(fromIndex, 1);
-      allItems.splice(toIndex, 0, movedItem);
-
-      const newExisting = allItems
-        .filter((item): item is { type: 'existing'; path: string; preview: string } => item.type === 'existing')
-        .map(item => item.path);
-      const newFiles = allItems
-        .filter((item): item is { type: 'new'; file: File; preview: string } => item.type === 'new')
-        .map(item => item.file);
-      const newPreviews = allItems.map(item => item.preview);
-
-      setExistingImages(newExisting);
-      setSelectedFiles(newFiles);
-      setImagePreviews(newPreviews);
-    }
   };
 
   const clearFieldError = (field: string) => {
@@ -183,7 +171,7 @@ export default function ProductForm() {
     if (!formData.description.trim()) errors.description = 'Campo obrigatório';
     if (!formData.price || formData.price <= 0) errors.price = 'Introduza um preço válido';
     if (!formData.category_id) errors.category_id = 'Selecione uma categoria';
-    if (!isEdit && selectedFiles.length === 0) errors.images = 'Adicione pelo menos uma imagem';
+    if (!isEdit && images.length === 0) errors.images = 'Adicione pelo menos uma imagem';
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -220,9 +208,13 @@ export default function ProductForm() {
       formDataToSend.append('featured', formData.featured.toString());
       
       // Append existing images (for edit mode)
-      if (isEdit && existingImages.length > 0) {
-        console.log('📋 Existing images to keep:', existingImages);
-        formDataToSend.append('existingImages', JSON.stringify(existingImages));
+      const existingImagesToKeep = images
+        .filter(img => img.type === 'existing')
+        .map(img => img.path);
+
+      if (isEdit && existingImagesToKeep.length > 0) {
+        console.log('📋 Existing images to keep:', existingImagesToKeep);
+        formDataToSend.append('existingImages', JSON.stringify(existingImagesToKeep));
       }
 
       // Append colors
@@ -231,8 +223,12 @@ export default function ProductForm() {
       }
       
       // Append new image files
-      console.log('📤 Uploading new files:', selectedFiles.length);
-      selectedFiles.forEach((file, index) => {
+      const newFiles = images
+        .filter(img => img.type === 'new')
+        .map(img => img.file as File);
+
+      console.log('📤 Uploading new files:', newFiles.length);
+      newFiles.forEach((file, index) => {
         console.log(`  📸 File ${index + 1}:`, file.name, file.type, file.size);
         formDataToSend.append('images', file);
       });
@@ -414,10 +410,10 @@ export default function ProductForm() {
               </div>
 
               {/* Image Previews */}
-              {imagePreviews.length > 0 && (
+              {images.length > 0 && (
                 <>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {imagePreviews.map((preview, index) => (
+                  {images.map((item, index) => (
                     <div
                       key={index}
                       className={`relative group transition-all ${
@@ -578,22 +574,40 @@ export default function ProductForm() {
                       <button
                         type="button"
                         onClick={(e) => {
+                          e.preventDefault();
                           e.stopPropagation();
                           removeImage(index);
                         }}
-                        onTouchEnd={(e) => {
-                          e.stopPropagation();
-                        }}
-                        className="absolute top-1 left-1 bg-red-500 text-white p-2 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-red-600 active:bg-red-700 z-20 touch-manipulation min-h-[36px] min-w-[36px] flex items-center justify-center"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchEnd={(e) => e.stopPropagation()}
+                        className="absolute top-1 left-1 bg-red-500 text-white p-2 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-red-600 active:bg-red-700 z-20 touch-manipulation min-h-[36px] min-w-[36px] flex items-center justify-center shadow-sm"
                         aria-label="Remover imagem"
                       >
                         <X size={16} />
                       </button>
 
+                      {/* Rotate button - Next to remove button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleRotateImage(index);
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchEnd={(e) => e.stopPropagation()}
+                        className="absolute top-1 left-11 bg-blue-500 text-white p-2 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-blue-600 active:bg-blue-700 z-20 touch-manipulation min-h-[36px] min-w-[36px] flex items-center justify-center shadow-sm"
+                        aria-label="Rodar imagem"
+                      >
+                        <RotateCw size={16} />
+                      </button>
+
                       <img
-                        src={preview}
+                        src={item.preview}
                         alt={`Imagem ${index + 1}`}
-                        className={`w-full h-32 sm:h-28 md:h-24 object-cover rounded-lg border-2 transition-all pointer-events-none ${
+                        className={`w-full aspect-square object-contain bg-gray-50 rounded-lg border-2 transition-all pointer-events-none ${
                           index === 0 ? 'border-primary-500' : 'border-gray-200'
                         }`}
                         onError={(e) => {
@@ -629,9 +643,9 @@ export default function ProductForm() {
                   >
                     <div className="relative w-full h-full animate-pulse-slow">
                       <img
-                        src={imagePreviews[draggedIndex]}
+                        src={images[draggedIndex].preview}
                         alt="Arrastando"
-                        className="w-full h-full object-cover rounded-lg border-2 border-primary-500 shadow-2xl opacity-90 transform rotate-3"
+                        className="w-full h-full object-contain bg-gray-50 rounded-lg border-2 border-primary-500 shadow-2xl opacity-90 transform rotate-3"
                       />
                       <div className="absolute inset-0 bg-primary-500/20 rounded-lg"></div>
                       <div className="absolute bottom-1 left-1 bg-primary-600 text-white text-xs px-2 py-1 rounded font-semibold">
@@ -654,9 +668,9 @@ export default function ProductForm() {
                   >
                     <div className="relative w-full h-full animate-pulse-slow">
                       <img
-                        src={imagePreviews[draggedIndex]}
+                        src={images[draggedIndex].preview}
                         alt="Arrastando"
-                        className="w-full h-full object-cover rounded-lg border-2 border-primary-500 shadow-2xl opacity-90 transform rotate-3"
+                        className="w-full h-full object-contain bg-gray-50 rounded-lg border-2 border-primary-500 shadow-2xl opacity-90 transform rotate-3"
                       />
                       <div className="absolute inset-0 bg-primary-500/20 rounded-lg"></div>
                       <div className="absolute bottom-1 left-1 bg-primary-600 text-white text-xs px-2 py-1 rounded font-semibold">
@@ -668,7 +682,7 @@ export default function ProductForm() {
                 </>
               )}
 
-              {imagePreviews.length === 0 && (
+              {images.length === 0 && (
                 <p className="text-sm text-gray-500 text-center">Nenhuma imagem adicionada</p>
               )}
             </div>

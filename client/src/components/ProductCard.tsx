@@ -144,7 +144,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
                   <img
                     src={getAbsoluteImageUrl(imgVariant(image, 'md'))}
                     alt={`${product.name} - ${index + 1}`}
-                    className="w-full h-full object-cover pointer-events-none"
+                    className="w-full h-full object-contain pointer-events-none bg-gray-50"
                     draggable={false}
                   />
                 </div>
@@ -299,7 +299,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
                   <img
                     src={getAbsoluteImageUrl(imgVariant(image, 'md'))}
                     alt={`${product.name} - ${index + 1}`}
-                    className="w-full h-full object-cover pointer-events-none"
+                    className="w-full h-full object-contain pointer-events-none bg-gray-50"
                     draggable={false}
                   />
                 </div>
@@ -451,7 +451,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, viewMode = 'grid', h
                 <img
                   src={getAbsoluteImageUrl(imgVariant(image, 'md'))}
                   alt={`${product.name} - ${index + 1}`}
-                  className="w-full h-full object-cover pointer-events-none"
+                  className="w-full h-full object-contain pointer-events-none bg-gray-50"
                   draggable={false}
                 />
               </div>

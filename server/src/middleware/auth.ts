@@ -25,22 +25,21 @@ export const authenticateToken = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
+  let token = '';
+  const reqContext = `[${req.ip || 'unknown IP'}] ${req.method} ${req.originalUrl}`;
+
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    console.log('🔐 Auth check - Header:', authHeader ? 'exists' : 'missing');
-    console.log('🔐 Auth check - Token:', token ? 'exists' : 'missing');
+    token = authHeader && authHeader.split(' ')[1] || '';
 
     if (!token) {
-      console.log('❌ No token provided');
+      console.log(`❌ No token provided for ${reqContext}`);
       res.status(401).json({ error: 'Token de acesso necessário' });
       return;
     }
 
     // Verify JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
-    console.log('✅ Token decoded, userId:', decoded.userId);
 
     // Check if user still exists and is active
     const [rows]: any = await pool.query(
@@ -49,7 +48,7 @@ export const authenticateToken = async (
     );
 
     if (rows.length === 0) {
-      console.log('❌ User not found:', decoded.userId);
+      console.log(`❌ User not found: ${decoded.userId} for ${reqContext}`);
       res.status(401).json({ error: 'Utilizador não encontrado' });
       return;
     }
@@ -57,7 +56,7 @@ export const authenticateToken = async (
     const user = rows[0];
 
     if (user.status !== 'active') {
-      console.log('❌ User inactive:', user.id, 'status:', user.status);
+      console.log(`❌ User inactive: ${user.id} (status: ${user.status}) for ${reqContext}`);
       res.status(401).json({ error: 'Conta suspensa ou inativa' });
       return;
     }
@@ -70,16 +69,28 @@ export const authenticateToken = async (
       name: user.name
     };
 
-    console.log('✅ Auth successful for user:', user.id, user.email);
     next();
   } catch (error) {
-    console.error('❌ Auth error:', error);
     if (error instanceof jwt.JsonWebTokenError) {
-      console.log('❌ JWT Error:', error.message);
+      // Tentar descodificar sem verificar só para saber quem era o utilizador
+      let userInfo = '';
+      try {
+        if (token) {
+          const decoded = jwt.decode(token) as JwtPayload | null;
+          if (decoded && decoded.email) {
+            userInfo = ` (User: ${decoded.userId} - ${decoded.email})`;
+          }
+        }
+      } catch (e) {
+        // Ignorar erros de descodificação
+      }
+      
+      console.log(`❌ JWT Error for ${reqContext}${userInfo}: ${error.message}`);
       res.status(403).json({ error: 'Token inválido ou expirado' });
       return;
     }
-    console.error('Authentication error:', error);
+    
+    console.error(`❌ Auth error for ${reqContext}:`, error);
     res.status(500).json({ error: 'Falha na autenticação' });
   }
 };

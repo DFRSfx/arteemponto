@@ -334,7 +334,7 @@ const Product: React.FC = () => {
                       key={index}
                       src={getAbsoluteImageUrl(image)}
                       alt={`${product.name} ${index + 1}`}
-                      className="w-full h-full object-cover flex-shrink-0"
+                      className="w-full h-full object-contain flex-shrink-0"
                       draggable={false}
                     />
                   ))}
@@ -407,7 +407,7 @@ const Product: React.FC = () => {
                       <img
                         src={getAbsoluteImageUrl(imgVariant(image, 'sm'))}
                         alt={`${product.name} ${index + 1}`}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                       />
                     </button>
                   ))}

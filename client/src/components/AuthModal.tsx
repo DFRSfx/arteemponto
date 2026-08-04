@@ -265,7 +265,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ code: codeResponse.code }),
+          body: JSON.stringify({ code: codeResponse.code, redirect_uri: 'postmessage' }),
         });
 
         if (!response.ok) {
@@ -291,8 +291,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
       showError('Erro ao fazer login com Google. Por favor, tente novamente.');
     },
     flow: 'auth-code',
-    ux_mode: 'redirect',
-    redirect_uri: window.location.origin,
   });
 
   // Swipe handlers for mobile
