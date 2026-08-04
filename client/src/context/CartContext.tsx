@@ -12,6 +12,8 @@ const getSessionId = (): string => {
   return sessionId;
 };
 
+const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
+
 interface CartState {
   items: CartItem[];
   total: number;
@@ -117,7 +119,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Load cart from database
   const loadCartFromDB = async () => {
     try {
-      const response = await fetch('/api/cart', {
+      const response = await fetch(`${API_BASE}/cart`, {
         headers: getHeaders(),
       });
 
@@ -164,7 +166,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // If user just logged in, merge session cart with user cart
       if (isAuthenticated && token) {
-        await fetch('/api/cart/merge', {
+        await fetch(`${API_BASE}/cart/merge`, {
           method: 'POST',
           headers: getHeaders(),
           body: JSON.stringify({ sessionId }),
@@ -203,7 +205,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Sync with database
     try {
-      await fetch('/api/cart/add', {
+      await fetch(`${API_BASE}/cart/add`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({
@@ -228,7 +230,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (cartItem?.cartItemId) {
         // Use the cart_items table ID
-        await fetch(`/api/cart/${cartItem.cartItemId}`, {
+        await fetch(`${API_BASE}/cart/${cartItem.cartItemId}`, {
           method: 'DELETE',
           headers: getHeaders(),
         });
@@ -250,12 +252,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!cartItem?.cartItemId) return;
 
       if (quantity <= 0) {
-        await fetch(`/api/cart/${cartItem.cartItemId}`, {
+        await fetch(`${API_BASE}/cart/${cartItem.cartItemId}`, {
           method: 'DELETE',
           headers: getHeaders(),
         });
       } else {
-        await fetch(`/api/cart/${cartItem.cartItemId}`, {
+        await fetch(`${API_BASE}/cart/${cartItem.cartItemId}`, {
           method: 'PUT',
           headers: getHeaders(),
           body: JSON.stringify({ quantity }),
@@ -272,7 +274,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Sync with database
     try {
-      await fetch('/api/cart', {
+      await fetch(`${API_BASE}/cart`, {
         method: 'DELETE',
         headers: getHeaders(),
       });

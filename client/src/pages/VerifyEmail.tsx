@@ -22,7 +22,8 @@ const VerifyEmail: React.FC = () => {
       }
 
       try {
-        const response = await fetch('/api/auth/verify-email', {
+        const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
+        const response = await fetch(`${API_BASE}/auth/verify-email`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

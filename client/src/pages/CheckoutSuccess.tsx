@@ -11,9 +11,10 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 // Retry helper with exponential backoff (1s → 2s → 4s)
 async function finalizeWithRetry(body: object, attempts = 3): Promise<{ id?: number; tracking_token?: string } | null> {
+  const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
   for (let i = 0; i < attempts; i++) {
     try {
-      const res = await fetch('/api/payment/finalize', {
+      const res = await fetch(`${API_BASE}/payment/finalize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

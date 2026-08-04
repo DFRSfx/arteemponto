@@ -34,25 +34,35 @@ app.set('trust proxy', 1);
 // Middleware
 app.use(helmet());
 
-// CORS configuration - allow multiple origins from environment variable
-const allowedOrigins = process.env.FRONTEND_URL?.split(',').map(url => url.trim()) || ['http://localhost:5173'];
+// CORS configuration - allow multiple origins, Vercel deployments, and localhost
+const rawOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',').map(url => url.trim().replace(/\/$/, ''))
+  : ['http://localhost:5173'];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps, curl, postman)
     if (!origin) return callback(null, true);
 
-    const isAllowed = allowedOrigins.includes('*') ||
-      allowedOrigins.includes(origin) ||
-      allowedOrigins.some(allowed => allowed.endsWith('.vercel.app') && origin.endsWith('.vercel.app'));
+    const cleanOrigin = origin.replace(/\/$/, '');
+
+    const isAllowed =
+      rawOrigins.includes('*') ||
+      rawOrigins.includes(cleanOrigin) ||
+      cleanOrigin.endsWith('.vercel.app') ||
+      cleanOrigin.includes('arteemponto.pt') ||
+      cleanOrigin.includes('localhost');
 
     if (isAllowed) {
       callback(null, true);
     } else {
-      callback(new Error(`Not allowed by CORS: ${origin}`));
+      console.warn(`⚠️ CORS blocked request from origin: ${origin}`);
+      callback(null, false);
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 // Raw body parser for Stripe webhook (must be before express.json())
