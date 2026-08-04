@@ -40,7 +40,8 @@
     "passport-google-oauth20": "^2.0.0",
     "resend": "^6.9.2",
     "sharp": "^0.34.4",
-    "stripe": "^20.4.0"
+    "stripe": "^20.4.0",
+    "esbuild": "^0.27.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
@@ -51,7 +52,6 @@
     "@types/node": "^20.10.0",
     "@types/nodemailer": "^6.4.21",
     "cross-env": "^10.1.0",
-    "esbuild": "^0.27.0",
     "tsx": "^4.20.6",
     "typescript": "^5.5.3"
   }
