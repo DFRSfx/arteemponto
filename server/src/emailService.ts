@@ -155,11 +155,16 @@ class EmailService {
   private from: string;
 
   constructor() {
-    this.resend = new Resend(process.env.RESEND_API_KEY);
+    const apiKey = process.env.RESEND_API_KEY || 're_placeholder_key_not_set';
+    this.resend = new Resend(apiKey);
     const name = process.env.EMAIL_FROM_NAME || 'Arte em Ponto';
     const address = process.env.EMAIL_FROM || 'onboarding@resend.dev';
     this.from = `${name} <${address}>`;
-    console.log('✅ Resend email service initialized — from:', this.from);
+    if (process.env.RESEND_API_KEY) {
+      console.log('✅ Resend email service initialized — from:', this.from);
+    } else {
+      console.warn('⚠️ RESEND_API_KEY not configured. Add RESEND_API_KEY to Render environment variables to enable email notifications.');
+    }
   }
 
   async sendPasswordResetEmail(email: string, resetToken: string, userName: string, language = 'pt') {
