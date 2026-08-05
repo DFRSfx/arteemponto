@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- Redirect apex domain to www domain -->
+    <script>
+      if (window.location.hostname === 'arteemponto.pt') {
+        window.location.replace('https://www.arteemponto.pt' + window.location.pathname + window.location.search + window.location.hash);
+      }
+    </script>
+
     <!-- Favicon e Ícones -->
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
