@@ -7,8 +7,8 @@ export async function fetchWithAuth(endpoint: string, options: RequestInit = {})
   // Check if body is FormData
   const isFormData = options.body instanceof FormData;
   
-  const headers: HeadersInit = {
-    ...options.headers,
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
   };
   
