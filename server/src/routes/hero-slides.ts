@@ -2,18 +2,11 @@ import express from 'express';
 import pool from '../config/database.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { upload } from '../config/upload.js';
+import { uploadToR2, deleteFromR2, publicCdnUrl } from '../config/r2.js';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import sharp from 'sharp';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 const router = express.Router();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const heroSlidesDir = path.join(__dirname, '../../public/hero-slides');
 
 const HERO_VARIANTS = [
   { variant: 'lg', suffix: '',    width: 1920, height: 1080, quality: 85 },
@@ -21,30 +14,32 @@ const HERO_VARIANTS = [
   { variant: 'sm', suffix: '-sm', width: 800,  height: 450,  quality: 68 },
 ] as const;
 
-function getSlidePath(id: number | string, suffix: string = ''): string {
-  return path.join(heroSlidesDir, `heroslide-${id}${suffix}.webp`);
-}
-
 function getSlideUrls(id: number | string, updatedAt: Date | string) {
   const ts = new Date(updatedAt).getTime();
   return {
-    background_image:    `/hero-slides/heroslide-${id}.webp?v=${ts}`,
-    background_image_md: `/hero-slides/heroslide-${id}-md.webp?v=${ts}`,
-    background_image_sm: `/hero-slides/heroslide-${id}-sm.webp?v=${ts}`,
+    background_image:    `${publicCdnUrl}/hero-slides/heroslide-${id}.webp?v=${ts}`,
+    background_image_md: `${publicCdnUrl}/hero-slides/heroslide-${id}-md.webp?v=${ts}`,
+    background_image_sm: `${publicCdnUrl}/hero-slides/heroslide-${id}-sm.webp?v=${ts}`,
   };
 }
 
-async function saveSlideImages(id: number | string, buffer: Buffer): Promise<void> {
-  fs.mkdirSync(heroSlidesDir, { recursive: true });
+async function saveSlideImagesToR2(id: number | string, buffer: Buffer): Promise<void> {
   const opts = { effort: 6, smartSubsample: true };
   await Promise.all(
-    HERO_VARIANTS.map(({ suffix, width, height, quality }) =>
-      sharp(buffer)
+    HERO_VARIANTS.map(async ({ suffix, width, height, quality }) => {
+      const variantBuffer = await sharp(buffer)
         .resize(width, height, { fit: 'cover', position: 'center' })
         .webp({ quality, ...opts })
-        .toFile(getSlidePath(id, suffix))
-    )
+        .toBuffer();
+      await uploadToR2(`hero-slides/heroslide-${id}${suffix}.webp`, variantBuffer);
+    })
   );
+}
+
+async function deleteSlideImagesFromR2(id: number | string): Promise<void> {
+  for (const { suffix } of HERO_VARIANTS) {
+    await deleteFromR2(`hero-slides/heroslide-${id}${suffix}.webp`);
+  }
 }
 
 interface HeroSlide extends RowDataPacket {
@@ -143,8 +138,8 @@ router.post('/', ...requireAdmin, upload.single('image'), async (req, res) => {
 
     const id = result.insertId;
 
-    // Save all size variants to disk
-    await saveSlideImages(id, req.file.buffer);
+    // Save all size variants to R2
+    await saveSlideImagesToR2(id, req.file.buffer);
 
     const [newSlide] = await pool.query<HeroSlide[]>(
       'SELECT id, title, description, button_text, button_link, text_color, display_order, is_active, created_at, updated_at FROM hero_slides WHERE id = ?',
@@ -184,9 +179,9 @@ router.put('/:id', ...requireAdmin, upload.single('image'), async (req, res) => 
       return res.status(404).json({ error: 'Slide not found' });
     }
 
-    // Overwrite all size variants on disk if a new image was uploaded
+    // Overwrite all size variants in R2 if a new image was uploaded
     if (req.file) {
-      await saveSlideImages(req.params.id, req.file.buffer);
+      await saveSlideImagesToR2(req.params.id, req.file.buffer);
     }
 
     const [updatedSlide] = await pool.query<HeroSlide[]>(
@@ -216,11 +211,8 @@ router.delete('/:id', ...requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Slide not found' });
     }
 
-    // Remove all size variants from disk
-    for (const { suffix } of HERO_VARIANTS) {
-      const filePath = getSlidePath(req.params.id, suffix);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
+    // Remove all size variants from R2
+    await deleteSlideImagesFromR2(req.params.id);
 
     res.json({ message: 'Slide deleted successfully' });
   } catch (error) {

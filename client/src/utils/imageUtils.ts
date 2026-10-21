@@ -24,14 +24,6 @@ export const getImageCacheKey = (): number => {
 };
 
 /**
- * Returns the image URL ready to use in <img src>.
- * - Absolute URLs are returned as-is.
- * - Relative paths (e.g. /produtos/1/image-1-1.webp) are prefixed with the
- *   backend origin so they work even when the frontend is on a different domain.
- *   In dev, VITE_API_URL defaults to http://localhost:3001 (Vite also proxies /produtos).
- *   In production, set VITE_API_URL to the backend domain (e.g. https://arteemponto.pt).
- */
-/**
  * Returns the URL for a specific size variant of a product image.
  * - 'lg': original path (max 1200 px) — product detail page
  * - 'md': medium (max 600 px)         — shop grid / modals
@@ -42,16 +34,27 @@ export const getImageCacheKey = (): number => {
  */
 export const imgVariant = (imagePath: string, variant: 'sm' | 'md' | 'lg'): string => {
   if (!imagePath || variant === 'lg') return imagePath;
-  return imagePath.replace(/\.webp$/, `-${variant}.webp`);
+  return imagePath.replace(/\.webp(\?.*)?$/, (_match, query) => `-${variant}.webp${query || ''}`);
 };
 
+/**
+ * Returns the image URL ready to use in <img src>.
+ * - Absolute URLs (Cloudflare R2 CDN) are returned as-is.
+ * - Relative paths (/produtos/... or /hero-slides/...) resolve to the CDN or backend.
+ */
 export const getAbsoluteImageUrl = (imageUrl: string): string => {
   if (!imageUrl) return '';
 
-  // Already absolute
+  // Already absolute (e.g. https://cdn.arteemponto.pt/...)
   if (imageUrl.startsWith('http')) return imageUrl;
 
-  // Prefix with backend origin so the path resolves correctly on any deployment
+  // Relative CDN media paths
+  if (imageUrl.startsWith('/produtos') || imageUrl.startsWith('/hero-slides')) {
+    const cdnOrigin = (import.meta.env.VITE_CDN_URL || 'https://cdn.arteemponto.pt').replace(/\/$/, '');
+    return `${cdnOrigin}${imageUrl}`;
+  }
+
+  // Fallback to backend origin
   const backendOrigin = import.meta.env.VITE_API_URL || 'http://localhost:3001';
   return `${backendOrigin}${imageUrl}`;
 };

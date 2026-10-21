@@ -2,56 +2,66 @@ import express from 'express';
 import pool from '../config/database.js';
 import { requireAdmin, AuthRequest } from '../middleware/auth.js';
 import { upload } from '../config/upload.js';
+import { uploadToR2, deleteFromR2, deletePrefixFromR2, publicCdnUrl } from '../config/r2.js';
 import sharp from 'sharp';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const getProductDir = (productId: number): string =>
-  path.join(__dirname, '../../public/produtos', String(productId));
-
-const saveImageToDisk = async (productId: number, buffer: Buffer, index: number): Promise<string> => {
-  const dir = getProductDir(productId);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
+const saveImageToR2 = async (productId: number, buffer: Buffer, index: number): Promise<string> => {
   const base = `image-${index}-${productId}`;
   const opts = { effort: 6, smartSubsample: true };
 
   // lg — product detail page (max 1200 px, quality 85)
-  await sharp(buffer)
+  const lgBuffer = await sharp(buffer)
     .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 85, ...opts })
-    .toFile(path.join(dir, `${base}.webp`));
+    .toBuffer();
+  await uploadToR2(`produtos/${productId}/${base}.webp`, lgBuffer);
 
   // md — shop grid (max 600 px, quality 82)
-  await sharp(buffer)
+  const mdBuffer = await sharp(buffer)
     .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 82, ...opts })
-    .toFile(path.join(dir, `${base}-md.webp`));
+    .toBuffer();
+  await uploadToR2(`produtos/${productId}/${base}-md.webp`, mdBuffer);
 
   // sm — admin / cart thumbnails (max 280 px, quality 75)
-  await sharp(buffer)
+  const smBuffer = await sharp(buffer)
     .resize(280, 280, { fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 75, ...opts })
-    .toFile(path.join(dir, `${base}-sm.webp`));
+    .toBuffer();
+  await uploadToR2(`produtos/${productId}/${base}-sm.webp`, smBuffer);
 
-  return `/produtos/${productId}/${base}.webp`;
+  return `${publicCdnUrl}/produtos/${productId}/${base}.webp`;
 };
 
-const getNextImageIndex = (productId: number): number => {
-  const dir = getProductDir(productId);
-  if (!fs.existsSync(dir)) return 1;
-  const files = fs.readdirSync(dir).filter(f => /^image-\d+-\d+\.webp$/.test(f));
-  if (files.length === 0) return 1;
-  const indices = files.map(f => parseInt(f.split('-')[1]));
-  return Math.max(...indices) + 1;
+const deleteProductImageVariantsFromR2 = async (imageUrlOrPath: string): Promise<void> => {
+  if (!imageUrlOrPath) return;
+  let cleanPath = imageUrlOrPath;
+  if (cleanPath.startsWith('http')) {
+    try {
+      cleanPath = new URL(cleanPath).pathname;
+    } catch {
+      // fallback
+    }
+  }
+  cleanPath = cleanPath.replace(/^\/+/, '');
+  const baseWithoutExt = cleanPath.replace(/\.webp$/, '');
+
+  for (const suffix of ['', '-md', '-sm']) {
+    await deleteFromR2(`${baseWithoutExt}${suffix}.webp`);
+  }
+};
+
+const getNextImageIndex = (existingImages: string[]): number => {
+  if (!existingImages || existingImages.length === 0) return 1;
+  const indices = existingImages.map(img => {
+    const match = img.match(/image-(\d+)-\d+/);
+    return match ? parseInt(match[1]) : 0;
+  });
+  return Math.max(0, ...indices) + 1;
 };
 
 const parseImages = (images: any): string[] => {
@@ -63,7 +73,7 @@ const parseImages = (images: any): string[] => {
   return [];
 };
 
-// ── GET all products (public) ─────────────────────────────────────────────────
+// ── GET all products (public) ────────────────────────────────────────────────
 
 router.get('/', async (req, res) => {
   try {
@@ -86,7 +96,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ── GET single product (public) ───────────────────────────────────────────────
+// ── GET single product (public) ──────────────────────────────────────────────
 
 router.get('/:id', async (req, res) => {
   try {
@@ -147,13 +157,13 @@ router.post(
       );
       const productId = result.insertId;
 
-      // Save each image to disk (generates lg / md / sm variants)
+      // Save each image to R2 (generates lg / md / sm variants)
       const imagePaths: string[] = [];
       for (let i = 0; i < files.length; i++) {
-        imagePaths.push(await saveImageToDisk(productId, files[i].buffer, i + 1));
+        imagePaths.push(await saveImageToR2(productId, files[i].buffer, i + 1));
       }
 
-      // Store paths in products table
+      // Store URLs in products table
       await pool.query('UPDATE products SET images = ? WHERE id = ?', [
         JSON.stringify(imagePaths),
         productId,
@@ -218,7 +228,7 @@ router.put(
         'SELECT images FROM products WHERE id = ?',
         [productId]
       );
-      const currentImages = parseImages(currentRows[0]?.images);
+      const currentImages: string[] = parseImages(currentRows[0]?.images);
 
       // Parse the list of paths the admin wants to keep
       let keepPaths: string[] = [];
@@ -230,27 +240,20 @@ router.put(
         }
       }
 
-      // Delete files that were removed by the admin (including md/sm variants)
-      const dir = getProductDir(productId);
+      // Delete files from R2 that were removed by the admin (including md/sm variants)
       for (const currentPath of currentImages) {
         if (!keepPaths.includes(currentPath)) {
-          const baseName = path.basename(currentPath, '.webp');
-          for (const suffix of ['', '-md', '-sm']) {
-            const filepath = path.join(dir, `${baseName}${suffix}.webp`);
-            if (fs.existsSync(filepath)) {
-              fs.unlinkSync(filepath);
-              console.log('🗑️ Deleted image:', `${baseName}${suffix}.webp`);
-            }
-          }
+          await deleteProductImageVariantsFromR2(currentPath);
+          console.log('🗑️ Deleted image from R2:', currentPath);
         }
       }
 
-      // Save new uploaded images (generates lg / md / sm variants)
+      // Save new uploaded images to R2 (generates lg / md / sm variants)
       const newPaths: string[] = [];
       if (files && files.length > 0) {
-        let nextIndex = getNextImageIndex(productId);
+        let nextIndex = getNextImageIndex(keepPaths);
         for (const file of files) {
-          newPaths.push(await saveImageToDisk(productId, file.buffer, nextIndex));
+          newPaths.push(await saveImageToR2(productId, file.buffer, nextIndex));
           nextIndex++;
         }
       }
@@ -282,7 +285,7 @@ router.put(
   }
 );
 
-// ── DELETE /:id — Delete product (admin) ─────────────────────────────────────
+// ── DELETE /:id — Delete product (admin) ──────────────────────────────────────
 
 router.delete('/:id', ...requireAdmin, async (req: AuthRequest, res) => {
   try {
@@ -298,12 +301,9 @@ router.delete('/:id', ...requireAdmin, async (req: AuthRequest, res) => {
       return;
     }
 
-    // Remove image directory from disk
-    const dir = getProductDir(productId);
-    if (fs.existsSync(dir)) {
-      fs.rmSync(dir, { recursive: true, force: true });
-      console.log('🗑️ Deleted product image directory for ID', productId);
-    }
+    // Remove all images under product prefix from R2
+    await deletePrefixFromR2(`produtos/${productId}/`);
+    console.log('🗑️ Deleted product images from R2 for ID', productId);
 
     res.json({ message: 'Product deleted successfully' });
   } catch (error) {

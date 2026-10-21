@@ -23,6 +23,7 @@ await esbuild.build({
     'google-auth-library',
     'sharp',
     'express-validator',
+    '@aws-sdk/client-s3',
   ],
   logLevel: 'info',
   banner: {
