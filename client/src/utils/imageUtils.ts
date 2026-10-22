@@ -1,4 +1,17 @@
 /**
+ * Normalizes URL protocol, fixing common typos like "https//domain" -> "https://domain"
+ */
+function normalizeProtocol(url: string): string {
+  if (!url) return '';
+  let cleaned = url.trim();
+  // Fix https// or http// without colon
+  cleaned = cleaned.replace(/^https?\/\//i, match => match.toLowerCase().startsWith('https') ? 'https://' : 'http://');
+  // Fix https:/ or http:/ with single slash
+  cleaned = cleaned.replace(/^https?:\/(?!\/)/i, match => match.toLowerCase().startsWith('https') ? 'https://' : 'http://');
+  return cleaned;
+}
+
+/**
  * Adds cache busting parameter to image URLs to force browser to reload
  * @param imageUrl - The image URL (can be relative or absolute)
  * @param forceBust - If true, adds timestamp. If false, returns original URL
@@ -39,22 +52,41 @@ export const imgVariant = (imagePath: string, variant: 'sm' | 'md' | 'lg'): stri
 
 /**
  * Returns the image URL ready to use in <img src>.
- * - Absolute URLs (Cloudflare R2 CDN) are returned as-is.
+ * - Absolute URLs (Cloudflare R2 CDN) are returned as-is (with protocol normalized).
  * - Relative paths (/produtos/... or /hero-slides/...) resolve to the CDN or backend.
  */
 export const getAbsoluteImageUrl = (imageUrl: string): string => {
   if (!imageUrl) return '';
 
-  // Already absolute (e.g. https://cdn.arteemponto.pt/...)
-  if (imageUrl.startsWith('http')) return imageUrl;
+  const normalizedUrl = normalizeProtocol(imageUrl);
+
+  // Already absolute (e.g. https://cdn-arteemponto.dariosoares.dev/...)
+  if (/^https?:\/\//i.test(normalizedUrl)) {
+    return normalizedUrl;
+  }
 
   // Relative CDN media paths
-  if (imageUrl.startsWith('/produtos') || imageUrl.startsWith('/hero-slides')) {
-    const cdnOrigin = (import.meta.env.VITE_CDN_URL || 'https://cdn.arteemponto.pt').replace(/\/$/, '');
-    return `${cdnOrigin}${imageUrl}`;
+  if (normalizedUrl.startsWith('/produtos') || normalizedUrl.startsWith('/hero-slides')) {
+    let cdnOrigin = normalizeProtocol(
+      import.meta.env.VITE_CDN_URL || 'https://cdn-arteemponto.dariosoares.dev'
+    );
+    if (!/^https?:\/\//i.test(cdnOrigin)) {
+      cdnOrigin = `https://${cdnOrigin.replace(/^\/+/, '')}`;
+    }
+    cdnOrigin = cdnOrigin.replace(/\/$/, '');
+    const cleanPath = normalizedUrl.startsWith('/') ? normalizedUrl : `/${normalizedUrl}`;
+    return `${cdnOrigin}${cleanPath}`;
   }
 
   // Fallback to backend origin
-  const backendOrigin = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-  return `${backendOrigin}${imageUrl}`;
+  let backendOrigin = normalizeProtocol(import.meta.env.VITE_API_URL || '');
+  if (!backendOrigin) {
+    return normalizedUrl.startsWith('/') ? normalizedUrl : `/${normalizedUrl}`;
+  }
+  if (!/^https?:\/\//i.test(backendOrigin)) {
+    backendOrigin = `https://${backendOrigin.replace(/^\/+/, '')}`;
+  }
+  backendOrigin = backendOrigin.replace(/\/$/, '');
+  const cleanPath = normalizedUrl.startsWith('/') ? normalizedUrl : `/${normalizedUrl}`;
+  return `${backendOrigin}${cleanPath}`;
 };
