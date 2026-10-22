@@ -3,7 +3,17 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const useSsl = process.env.DB_SSL === 'true' || process.env.DB_SSL === 'REQUIRED' || process.env.DB_SSL === 'required';
+const isRemote =
+  process.env.DB_HOST &&
+  !process.env.DB_HOST.includes('localhost') &&
+  process.env.DB_HOST !== '127.0.0.1';
+
+const useSsl =
+  process.env.DB_SSL === 'true' ||
+  process.env.DB_SSL === 'REQUIRED' ||
+  process.env.DB_SSL === 'required' ||
+  (isRemote && process.env.NODE_ENV === 'production');
+
 const sslConfig = useSsl ? { rejectUnauthorized: false } : undefined;
 
 const pool = process.env.DATABASE_URL
@@ -12,6 +22,7 @@ const pool = process.env.DATABASE_URL
       ssl: sslConfig,
       waitForConnections: true,
       connectionLimit: 10,
+      connectTimeout: 10000,
       queueLimit: 0,
       enableKeepAlive: true,
       keepAliveInitialDelay: 0
@@ -25,19 +36,20 @@ const pool = process.env.DATABASE_URL
       ssl: sslConfig,
       waitForConnections: true,
       connectionLimit: 10,
+      connectTimeout: 10000,
       queueLimit: 0,
       enableKeepAlive: true,
       keepAliveInitialDelay: 0
     });
 
-// Test connection
+// Test connection on startup
 pool.getConnection()
   .then(connection => {
     console.log('✅ Database connected successfully');
     connection.release();
   })
   .catch(err => {
-    console.error('❌ Database connection failed:', err.message);
+    console.error('❌ Database connection failed:', err.message, 'Code:', err.code);
   });
 
 export default pool;

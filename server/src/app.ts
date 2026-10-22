@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import pool from './config/database.js';
 import authRouter from './routes/auth.js';
 import googleAuthRouter from './routes/google-auth.js';
 import productsRouter from './routes/products.js';
@@ -93,12 +94,35 @@ app.get('/', (req, res) => {
       favorites: '/api/favorites',
       shippingAddresses: '/api/shipping-addresses',
       payment: '/api/payment',
-      health: '/health'
+      health: '/api/health'
     }
   });
 });
 
-// Health check endpoint
+// Health check endpoint with database diagnostics
+app.get('/api/health', async (req, res) => {
+  try {
+    const connection = await pool.getConnection();
+    connection.release();
+    res.json({
+      status: 'ok',
+      database: 'connected',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      status: 'error',
+      database: 'failed',
+      message: err.message,
+      code: err.code || 'UNKNOWN',
+      host: process.env.DB_HOST ? `${process.env.DB_HOST.substring(0, 4)}***` : (process.env.DATABASE_URL ? 'using_database_url' : 'not_set'),
+      database_name: process.env.DB_NAME || 'not_set',
+      ssl: process.env.DB_SSL || 'auto'
+    });
+  }
+});
+
+// Fallback health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
