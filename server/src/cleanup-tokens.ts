@@ -1,4 +1,4 @@
-import PasswordReset from './models/PasswordReset';
+import PasswordReset from './models/PasswordReset.js';
 
 /**
  * Script para limpar tokens expirados e tentativas antigas
@@ -16,7 +16,7 @@ async function cleanup() {
     await PasswordReset.cleanupOldAttempts();
     console.log('✅ Old attempts cleaned');
 
-    console.log('✅ Cleanup completed successfully');
+    console.log('🎉 Cleanup completed successfully');
     process.exit(0);
   } catch (error) {
     console.error('❌ Error during cleanup:', error);
@@ -24,4 +24,9 @@ async function cleanup() {
   }
 }
 
-cleanup();
+// Executar se chamado diretamente
+if (import.meta.url === `file://${process.argv[1]}`) {
+  cleanup();
+}
+
+export default cleanup;

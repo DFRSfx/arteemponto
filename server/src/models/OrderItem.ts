@@ -1,4 +1,4 @@
-import pool from '../config/database';
+import pool from '../config/database.js';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 export interface OrderItem {
