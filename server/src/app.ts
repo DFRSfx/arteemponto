@@ -30,12 +30,13 @@ const app = express();
 // Trust proxy for reverse proxies (Render, Koyeb, Vercel)
 app.set('trust proxy', 1);
 
-// Middleware
+// Security middleware with relaxed CSP for development and CDN images
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
 }));
 
-// CORS configuration - allow multiple origins, Vercel deployments, and localhost
+// CORS Configuration
 const rawOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim().replace(/\/$/, ''))
   : ['http://localhost:5173'];
@@ -51,6 +52,7 @@ app.use(cors({
       rawOrigins.includes(cleanOrigin) ||
       cleanOrigin.endsWith('.vercel.app') ||
       cleanOrigin.includes('arteemponto.pt') ||
+      cleanOrigin.includes('dariosoares.dev') ||
       cleanOrigin.includes('localhost');
 
     if (isAllowed) {
@@ -68,32 +70,37 @@ app.use(cors({
 // Raw body parser for Stripe webhook (must be before express.json())
 app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Regular body parser for other routes
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve product images as static files (local development fallback)
-app.use('/produtos', (_req, res, next) => {
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  next();
-}, express.static(path.join(__dirname, '../public/produtos')));
+// Serve static files from public directory (fallback / local dev)
+app.use(express.static(path.join(__dirname, '../public')));
 
-// Serve hero slide images as static files (local development fallback)
-app.use('/hero-slides', (_req, res, next) => {
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  next();
-}, express.static(path.join(__dirname, '../public/hero-slides')));
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Arte em Ponto API is running',
+    version: '1.0.0',
+    endpoints: {
+      auth: '/api/auth',
+      googleAuth: '/api/auth/google',
+      products: '/api/products',
+      categories: '/api/categories',
+      orders: '/api/orders',
+      heroSlides: '/api/hero-slides',
+      cart: '/api/cart',
+      favorites: '/api/favorites',
+      shippingAddresses: '/api/shipping-addresses',
+      payment: '/api/payment',
+      health: '/health'
+    }
+  });
+});
 
-// Health checks
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-app.get('/api', (req, res) => {
-  res.json({ status: 'ok', message: 'Arte em Ponto API is running', timestamp: new Date().toISOString() });
 });
 
 // API Routes
@@ -111,7 +118,7 @@ app.use('/api/favorites', favoritesRouter);
 app.use('/api/shipping-addresses', shippingAddressesRouter);
 app.use('/api/payment', paymentRouter);
 
-// Error handling
+// Error handling middleware (must be last)
 app.use(errorHandler);
 
 export default app;
