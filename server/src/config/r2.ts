@@ -9,11 +9,22 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+function cleanUrl(url?: string): string {
+  if (!url) return 'https://cdn-arteemponto.dariosoares.dev';
+  let clean = url.trim();
+  clean = clean.replace(/^https?\/\//i, match => match.toLowerCase().startsWith('https') ? 'https://' : 'http://');
+  clean = clean.replace(/^https?:\/(?!\/)/i, match => match.toLowerCase().startsWith('https') ? 'https://' : 'http://');
+  if (!/^https?:\/\//i.test(clean)) {
+    clean = `https://${clean.replace(/^\/+/, '')}`;
+  }
+  return clean.replace(/\/$/, '');
+}
+
 const accountId = process.env.R2_ACCOUNT_ID || 'c399f84836491150fe0c599472222fbe';
 const accessKeyId = process.env.R2_ACCESS_KEY_ID || '';
 const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || '';
 export const bucketName = process.env.R2_BUCKET_NAME || 'arteemponto-images';
-export const publicCdnUrl = (process.env.R2_PUBLIC_URL || 'https://cdn.arteemponto.pt').replace(/\/$/, '');
+export const publicCdnUrl = cleanUrl(process.env.R2_PUBLIC_URL);
 
 export const s3Client = new S3Client({
   region: 'auto',

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Plus, Edit, Trash2, Save, X, MoveVertical, Eye, EyeOff } from 'lucide-react';
 import AdminSelect from '../components/AdminSelect';
 import { useToast } from '../../context/ToastContext';
+import { getAbsoluteImageUrl } from '../../utils/imageUtils';
 
 const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const API_URL = `${SERVER_URL}/api`;
@@ -540,7 +541,7 @@ export default function HeroSlidesList() {
             <div className="relative h-48 overflow-hidden">
               <div
                 className="absolute inset-0 bg-cover bg-center"
-                style={{ backgroundImage: `url(${SERVER_URL}${slide.background_image_md || slide.background_image})` }}
+                style={{ backgroundImage: `url(${getAbsoluteImageUrl(slide.background_image_md || slide.background_image)})` }}
               >
                 {/* Overlay */}
                 <div className="absolute inset-0 bg-black bg-opacity-40"></div>
@@ -778,7 +779,7 @@ export default function HeroSlidesList() {
                         {/* Show current image or preview */}
                         <div className="mt-3">
                           <img
-                            src={imagePreview || `${SERVER_URL}${slide.background_image_md || slide.background_image}`}
+                            src={imagePreview || getAbsoluteImageUrl(slide.background_image_md || slide.background_image)}
                             alt="Preview"
                             className="w-full h-48 object-cover rounded-lg"
                           />

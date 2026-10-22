@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getAbsoluteImageUrl } from '../utils/imageUtils';
 
 interface SlideData {
   id: number;
@@ -29,8 +30,8 @@ const HeroSlider: React.FC = () => {
   useEffect(() => {
     const fetchSlides = async () => {
       try {
-        const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-        const API_BASE = `${SERVER_URL}/api`;
+        const SERVER_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+        const API_BASE = SERVER_URL ? `${SERVER_URL}/api` : '/api';
         const response = await fetch(`${API_BASE}/hero-slides`);
         if (response.ok) {
           const data = await response.json();
@@ -41,9 +42,9 @@ const HeroSlider: React.FC = () => {
             description: slide.description || '',
             buttonText: slide.button_text,
             buttonLink: slide.button_link,
-            backgroundImage:   `${SERVER_URL}${slide.background_image}`,
-            backgroundImageMd: `${SERVER_URL}${slide.background_image_md}`,
-            backgroundImageSm: `${SERVER_URL}${slide.background_image_sm}`,
+            backgroundImage:   getAbsoluteImageUrl(slide.background_image),
+            backgroundImageMd: getAbsoluteImageUrl(slide.background_image_md || slide.background_image),
+            backgroundImageSm: getAbsoluteImageUrl(slide.background_image_sm || slide.background_image_md || slide.background_image),
             textColor: slide.text_color || 'white'
           }));
 
@@ -259,76 +260,80 @@ const HeroSlider: React.FC = () => {
                     onLoad={() => {
                       setImagesLoaded(prev => new Set(prev).add(index));
                     }}
-                    loading="eager"
-                    fetchpriority={index === 0 ? 'high' : 'auto'}
+                    loading={index === 0 ? 'eager' : 'lazy'}
+                    decoding="async"
                   />
                 </picture>
-                {/* Overlay */}
-                <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+                <div className="absolute inset-0 bg-black/40"></div>
               </div>
 
-            {/* Content */}
-            <div className="relative z-10 h-full flex items-center">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-                <div className="max-w-2xl">
-                  <h1
-                    className={`text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6 ${
-                      slide.textColor === 'white' ? 'text-white' : 'text-gray-900'
+              {/* Content */}
+              <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center">
+                <div className="max-w-xl">
+                  <h2
+                    className={`text-4xl md:text-6xl font-serif font-bold mb-4 tracking-tight ${
+                      slide.textColor === 'dark' ? 'text-gray-900' : 'text-white'
                     }`}
                   >
                     {slide.title}
-                  </h1>
-                  <p 
+                  </h2>
+                  <p
                     className={`text-lg md:text-xl mb-8 leading-relaxed ${
-                      slide.textColor === 'white' ? 'text-gray-100' : 'text-gray-600'
+                      slide.textColor === 'dark' ? 'text-gray-700' : 'text-gray-100'
                     }`}
                   >
                     {slide.description}
                   </p>
-                  <Link
-                    to={slide.buttonLink}
-                    className="inline-flex items-center gap-2 px-8 py-4 bg-primary-600 text-white font-semibold rounded-lg hover:bg-primary-700 transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 hover:scale-105 active:scale-95 relative overflow-hidden group"
-                  >
-                    <span className="relative z-10">{slide.buttonText}</span>
-                    <svg className="w-5 h-5 transform group-hover:translate-x-1 transition-transform duration-300 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                    <span className="absolute inset-0 bg-primary-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></span>
-                  </Link>
+                  {slide.buttonText && slide.buttonLink && (
+                    <Link
+                      to={slide.buttonLink}
+                      className="inline-flex items-center px-8 py-3 rounded-full bg-primary-600 text-white font-medium hover:bg-primary-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    >
+                      {slide.buttonText}
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>
-            </div>
-          );
-          })}
+          )})}
         </div>
       </div>
 
-      {/* Dots Indicator */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 flex space-x-3 bg-black bg-opacity-20 backdrop-blur-sm px-4 py-3 rounded-full">
-        {slides.map((_, index) => (
+      {/* Navigation Arrows */}
+      {slides.length > 1 && (
+        <>
           <button
-            key={index}
-            onClick={() => goToSlide(index)}
-            className={`rounded-full transition-all duration-300 hover:scale-125 ${
-              index === currentSlide
-                ? 'w-8 h-3 bg-primary-600 shadow-lg'
-                : 'w-3 h-3 bg-white bg-opacity-60 hover:bg-opacity-90 hover:bg-primary-400'
-            }`}
-            aria-label={`Ir para slide ${index + 1}`}
-          />
-        ))}
-      </div>
+            onClick={goToPrevious}
+            className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/20 backdrop-blur-sm text-white hover:bg-white/30 transition-all duration-200 focus:outline-none"
+            aria-label="Slide anterior"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <button
+            onClick={goToNext}
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/20 backdrop-blur-sm text-white hover:bg-white/30 transition-all duration-200 focus:outline-none"
+            aria-label="Próximo slide"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
 
-      {/* Progress Bar */}
-      <div className="absolute bottom-0 left-0 w-full h-1 bg-black bg-opacity-20 z-20">
-        <div
-          className="h-full bg-primary-600 transition-all duration-300 ease-linear"
-          style={{
-            width: `${((currentSlide + 1) / slides.length) * 100}%`,
-          }}
-        />
-      </div>
+          {/* Dots Indicator */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex space-x-2">
+            {slides.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => goToSlide(index)}
+                className={`w-2.5 h-2.5 rounded-full transition-all duration-200 focus:outline-none ${
+                  index === currentSlide
+                    ? 'w-8 bg-white'
+                    : 'bg-white/50 hover:bg-white/75'
+                }`}
+                aria-label={`Ir para o slide ${index + 1}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </section>
   );
 };
